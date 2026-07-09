@@ -55,25 +55,40 @@
       <template #bodyCell="{ column, record }">
 
         <template v-if="column.key === 'name'">
-          <span
-              style="color: #00bcd4; cursor: pointer; font-weight: 500;"
-              @click="goToDetailByName(record)"
-          >
+          <span>
             {{ record.name }}
           </span>
         </template>
 
         <template v-else-if="column.key === 'scope_array'">
-          <div style="display: flex; flex-wrap: wrap; gap: 4px;">
+          <div style="display: flex; flex-wrap: wrap; gap: 4px; align-items: center;">
             <a-tag
-                v-for="(item, idx) in record.scope_array"
+                v-for="(item, idx) in (record.scope_array || []).slice(0, 5)"
                 :key="idx"
                 closable
-                style="background: #fafafa; color: #666; border-color: #d9d9d9;"
+                style="background: #fafafa; color: #666; border-color: #d9d9d9; margin-right: 0;"
                 @close="handleRemoveScope(record, item)"
             >
               {{ item }}
             </a-tag>
+            <a-popover v-if="(record.scope_array || []).length > 5" placement="bottomLeft">
+              <template #content>
+                <div style="max-width: 400px; max-height: 300px; overflow-y: auto; display: flex; flex-wrap: wrap; gap: 4px; padding: 4px;">
+                  <a-tag
+                      v-for="(item, idx) in record.scope_array.slice(5)"
+                      :key="idx"
+                      closable
+                      style="background: #fafafa; color: #666; border-color: #d9d9d9; margin-right: 0;"
+                      @close="handleRemoveScope(record, item)"
+                  >
+                    {{ item }}
+                  </a-tag>
+                </div>
+              </template>
+              <a-tag style="background: #fff; border-style: dashed; cursor: pointer; margin-right: 0;">
+                +{{ record.scope_array.length - 5 }} 更多
+              </a-tag>
+            </a-popover>
           </div>
         </template>
 
@@ -488,16 +503,7 @@ const goToDetail = (record) => {
   });
 };
 
-// 🚨 专门处理点击“资产组名称”的跳转，传真实名称
-const goToDetailByName = (record) => {
-  router.push({
-    path: '/groupAssetsManagement/groupAssetsDetail',
-    query: {
-      scope_id: record._id, // 范围 ID 保持不变
-      targetName: record.name // 核心区别：这里传的是真实的中文名称！
-    }
-  });
-};
+
 
 // ================= 添加监控任务 =================
 const addMonitorVisible = ref(false);

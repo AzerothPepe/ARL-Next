@@ -16,7 +16,11 @@ base_query_fields = {
 }
 
 # 只能用等号进行mongo查询的字段
-EQUAL_FIELDS = ["task_id", "task_tag", "ip_type", "scope_id", "type"]
+EQUAL_FIELDS = [
+    "task_id", "task_tag", "ip_type", "scope_id", "type", "query_type",
+    "status", "schedule_status", "schedule_type", "source",
+    "plg_type", "plugin_type", "vuln_severity", "port_scan_type", "finger"
+]
 
 
 class ARLResource(Resource):
@@ -114,6 +118,20 @@ class ARLResource(Resource):
                 })
                 query_args[real_key] = raw_value
 
+            # __ngt 代表 numeric greater than (数字大于)
+            elif key.endswith("__ngt"):
+                real_key = key.split('__ngt')[0]
+                raw_value = query_args.get(real_key, {})
+                raw_value.update({"$gt": float(args[key])})
+                query_args[real_key] = raw_value
+
+            # __nlt 代表 numeric less than (数字小于)
+            elif key.endswith("__nlt"):
+                real_key = key.split('__nlt')[0]
+                raw_value = query_args.get(real_key, {})
+                raw_value.update({"$lt": float(args[key])})
+                query_args[real_key] = raw_value
+
             # __neq 代表 not equal (不等于)
             elif key.endswith("__neq"):
                 real_key = key.split('__neq')[0]
@@ -148,12 +166,14 @@ class ARLResource(Resource):
 
             # 5. 普通字符串处理（如果没有上面那些花里胡哨的后缀）
             elif isinstance(args[key], str):
+                actual_key = "finger.name" if key == "finger" else key
+                
                 # 如果是设定好的必须绝对相等的字段（比如 task_id），直接赋值
                 if key in EQUAL_FIELDS:
-                    query_args[key] = args[key]
+                    query_args[actual_key] = args[key]
                 else:
                     # 否则，一律默认变成“模糊搜索”（使用正则表达式 $regex，且忽略大小写 $options: "i"）
-                    query_args[key] = {
+                    query_args[actual_key] = {
                         "$regex": re.escape(args[key]),
                         '$options': "i"
                     }
@@ -213,11 +233,15 @@ class ARLResource(Resource):
         query = self.build_db_query(args)
 
         # 3. 核心数据库操作（连招）：
-        #   find(query): 按照条件查找
-        #   sort(): 排序
-        #   skip(): 跳过前面不要的数据（比如第2页每页10条，就跳过前10条）
-        #   limit(): 限制只拿多少条（每页的数据量）
-        result = conn(collection).find(query).sort(orderby_list).skip(size * (page - 1)).limit(size)
+        # 加入 projection 剔除特别大的无用字段 (如 favicon.data 和 body)
+        projection = None
+        if collection in ["site", "asset_site"]:
+            projection = {"favicon.data": 0, "body": 0}
+            
+        if projection:
+            result = conn(collection).find(query, projection).sort(orderby_list).skip(size * (page - 1)).limit(size)
+        else:
+            result = conn(collection).find(query).sort(orderby_list).skip(size * (page - 1)).limit(size)
 
         # 4. 计算一共有多少条符合条件的数据（前端要做分页条，必须知道总数）
         count = conn(collection).count(query)
@@ -570,4 +594,15 @@ from .dictionary import ns as dictionary_ns
 from .cdn_dict import ns as cdn_dict_ns
 from .system_config import ns as system_config_ns
 from .icp import ns as icp_ns
+
+
+from .assetCert import ns as asset_cert_ns
+from .assetService import ns as asset_service_ns
+from .assetFileleak import ns as asset_fileleak_ns
+from .assetUrl import ns as asset_url_ns
+from .assetVuln import ns as asset_vuln_ns
+from .assetNpocService import ns as asset_npoc_service_ns
+from .assetCip import ns as asset_cip_ns
+from .assetNucleiResult import ns as asset_nuclei_result_ns
+from .assetStatFinger import ns as asset_stat_finger_ns
 

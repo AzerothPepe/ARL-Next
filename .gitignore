@@ -13,8 +13,6 @@ mkcert.exe
 backend/config-docker.yaml
 backend/app/config.yaml
 
-# 如果未来有专门的生产环境配置，也一并忽略
-docker-compose.prod.yml
 
 # Python cache files
 __pycache__/
@@ -27,6 +25,7 @@ backend/*.log
 # IDE & OS files
 .idea/
 .DS_Store
+.vscode/
 
 # Test Cache
 .pytest_cache/
@@ -37,3 +36,16 @@ reference/
 
 # Celery Beat persistent db
 backend/celerybeat-schedule.db
+backend/.venv-docker/
+
+
+#系统临时生成文件
+backend/app/tmp/
+backend/app/tmp_screenshot/
+ssl-certs/
+fingerprint_new/
+.agents/
+server.txt
+lab/
+apikey.txt
+prompt.txt

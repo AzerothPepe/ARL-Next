@@ -1,5 +1,5 @@
 CELERY:
-  BROKER_URL : "redis://redis:6379/0"
+  BROKER_URL : "amqp://admin:admin@rabbitmq:5672/"
 
 
 MONGO:
@@ -8,8 +8,8 @@ MONGO:
 
 #GeoIP 数据库文件配置项
 GEOIP:
-  CITY: '/data/GeoLite2/GeoLite2-City.mmdb'
-  ASN: '/data/GeoLite2/GeoLite2-ASN.mmdb'
+  CITY: '/code/GeoLite2/GeoLite2-City.mmdb'
+  ASN: '/code/GeoLite2/GeoLite2-ASN.mmdb'
 
 
 #Fofa API 配置�?
@@ -17,7 +17,7 @@ FOFA:
   URL: "https://fofa.info"
   EMAIL: "已经不需要配置了"
   KEY: ""
-  MAX_PAGE: 5
+  MAX_PAGE: 50
   PAGE_SIZE: 2000
 
 
@@ -34,15 +34,12 @@ QUERY_PLUGIN:
   crtsh:
     enable: true
   fofa:  # fofa 的key配置在上�?
+  fofa:  # fofa 的key配置在上?
     enable: true
   hunter_qax: # 网站 https://hunter.qianxin.com/
     api_key: ""
     page_size: 100
     max_page: 5
-    enable: false
-  passivetotal: # 请前往 https://community.riskiq.com/ 注册自己的key并替�?
-    auth_email: ""
-    auth_key: ""
     enable: false
   quake_360: # 网站 https://quake.360.cn/
     quake_token: ""
@@ -127,9 +124,7 @@ ARL:
     #- 192.168.0.0/16
   ## 禁止域名，不可为空数�?
   FORBIDDEN_DOMAINS:
-    - edu.cn
-    - org.cn
-    - gov.cn
+    - xxx.xx
   #端口对应前端测试选项
   PORT_TOP_10: "80,443,8443,8080,8081,8888,8089,5000,5001,8085,800,81,9000,88,8001,8090"
   #域名爆破字典前端大字典选项
@@ -137,7 +132,12 @@ ARL:
   #文件泄漏字典
   FILE_LEAK_DICT: "/code/app/dicts/file_top_2000.txt"
 
-  #域名爆破并发�?
+  #域名爆破并发?
   DOMAIN_BRUTE_CONCURRENT: 300
   #组合生成的域名爆破并发数
   ALT_DNS_CONCURRENT: 1500
+
+# 天眼查 API 配置（用于企业边界查询）
+TYC:
+  ID: ""
+  TOKEN: ""

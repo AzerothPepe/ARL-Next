@@ -7,23 +7,23 @@
     />
 
     <a-tabs v-model:activeKey="activeTab" type="card" class="arl-detail-tabs">
-      <a-tab-pane key="site" :tab="`站点 - ${queryCounts.site}`"></a-tab-pane>
-      <a-tab-pane key="domain" :tab="`子域名 - ${queryCounts.domain}`"></a-tab-pane>
-      <a-tab-pane key="ip" :tab="`IP - ${queryCounts.ip}`"></a-tab-pane>
-      <a-tab-pane key="cert" :tab="`SSL证书 - ${queryCounts.cert}`"></a-tab-pane>
-      <a-tab-pane key="service" :tab="`服务 - ${queryCounts.service}`"></a-tab-pane>
-      <a-tab-pane key="fileleak" :tab="`文件泄露 - ${queryCounts.fileleak}`"></a-tab-pane>
-      <a-tab-pane key="url" :tab="`URL信息 - ${queryCounts.url}`"></a-tab-pane>
-      <a-tab-pane key="vuln" :tab="`风险 - ${queryCounts.vuln}`"></a-tab-pane>
-      <a-tab-pane key="npoc_service" :tab="`服务（python） - ${queryCounts.npoc_service}`"></a-tab-pane>
-      <a-tab-pane key="cip" :tab="`C段 - ${queryCounts.cip}`"></a-tab-pane>
-      <a-tab-pane key="nuclei_result" :tab="`nuclei - ${queryCounts.nuclei_result}`"></a-tab-pane>
-      <a-tab-pane key="stat_finger" :tab="`指纹统计 - ${queryCounts.stat_finger}`"></a-tab-pane>
-      <a-tab-pane key="wih" :tab="`WIH - ${queryCounts.wih}`"></a-tab-pane>
-      <a-tab-pane key="syslog" tab="任务日志"></a-tab-pane>
+      <a-tab-pane key="site" :tab="query.task_id ? `站点 - ${queryCounts.site}` : '站点'"></a-tab-pane>
+      <a-tab-pane key="domain" :tab="query.task_id ? `子域名 - ${queryCounts.domain}` : '子域名'"></a-tab-pane>
+      <a-tab-pane key="ip" :tab="query.task_id ? `IP - ${queryCounts.ip}` : 'IP'"></a-tab-pane>
+      <a-tab-pane key="cert" :tab="query.task_id ? `SSL证书 - ${queryCounts.cert}` : 'SSL证书'"></a-tab-pane>
+      <a-tab-pane key="service" :tab="query.task_id ? `服务 - ${queryCounts.service}` : '服务'"></a-tab-pane>
+      <a-tab-pane key="fileleak" :tab="query.task_id ? `文件泄露 - ${queryCounts.fileleak}` : '文件泄露'"></a-tab-pane>
+      <a-tab-pane key="url" :tab="query.task_id ? `URL信息 - ${queryCounts.url}` : 'URL信息'"></a-tab-pane>
+      <a-tab-pane key="vuln" :tab="query.task_id ? `风险 - ${queryCounts.vuln}` : '风险'"></a-tab-pane>
+      <a-tab-pane key="npoc_service" :tab="query.task_id ? `服务（python） - ${queryCounts.npoc_service}` : '服务（python）'"></a-tab-pane>
+      <a-tab-pane key="cip" :tab="query.task_id ? `C段 - ${queryCounts.cip}` : 'C段'"></a-tab-pane>
+      <a-tab-pane key="nuclei_result" :tab="query.task_id ? `nuclei - ${queryCounts.nuclei_result}` : 'nuclei'"></a-tab-pane>
+      <a-tab-pane key="stat_finger" :tab="query.task_id ? `指纹统计 - ${queryCounts.stat_finger}` : '指纹统计'"></a-tab-pane>
+      <a-tab-pane key="wih" :tab="query.task_id ? `WIH - ${queryCounts.wih}` : 'WIH'"></a-tab-pane>
+      <a-tab-pane v-if="query.task_id" key="syslog" tab="任务日志"></a-tab-pane>
     </a-tabs>
 
-    <div v-if="tabConfig[activeTab]?.searchFields" class="search-row" style="margin-bottom: 16px;">
+    <div v-if="tabConfig[activeTab]?.searchFields && activeTab !== 'syslog'" class="search-row" style="margin-bottom: 16px;">
       <div v-for="field in tabConfig[activeTab].searchFields" :key="field.key" class="search-item">
         <span class="label">{{ field.label }}：</span>
 
@@ -82,7 +82,7 @@
       </div>
     </div>
 
-    <div style="margin-bottom: 16px;">
+    <div v-show="activeTab !== 'syslog'" style="margin-bottom: 16px;">
       <a-button :disabled="!hasSelected" style="margin-right: 16px;" @click="handleBatchDelete">批量删除</a-button>
       <a-button style="margin-right: 16px;" @click="resetSearch">清 除</a-button>
       <a-button v-if="tabConfig[activeTab]?.exportName" type="primary" style="background-color: #00bcd4; border-color: #00bcd4; margin-right: 16px;" @click="handleExport">导出{{ tabConfig[activeTab].exportName }}</a-button>
@@ -90,6 +90,7 @@
     </div>
 
     <a-table
+        v-show="activeTab !== 'syslog'"
         :row-selection="{ selectedRowKeys: selectedRowKeys, onChange: onSelectChange }"
         :loading="loading"
         :dataSource="dataSource"
@@ -137,8 +138,16 @@
 
 
         <template v-else-if="column.key === 'finger'">
-          <div v-if="record.finger">
-            <p v-for="f in record.finger" :key="f.name" style="margin-bottom: 4px; color: rgba(0,0,0,0.65);">{{ f.name }}</p>
+          <div v-if="record.finger && record.finger.length > 0" style="display: flex; flex-wrap: wrap; gap: 4px;">
+            <a-tag v-for="f in record.finger.slice(0, 3)" :key="f.name" color="blue" style="margin: 0; white-space: normal; height: auto; text-align: left;">{{ f.name }}</a-tag>
+            <a-popover v-if="record.finger.length > 3" placement="top">
+              <template #content>
+                <div style="display: flex; flex-wrap: wrap; gap: 4px; max-width: 300px; max-height: 200px; overflow-y: auto;">
+                  <a-tag v-for="f in record.finger" :key="f.name" color="blue" style="margin: 0; white-space: normal; height: auto; text-align: left;">{{ f.name }}</a-tag>
+                </div>
+              </template>
+              <a-tag style="margin: 0; cursor: pointer; border-style: dashed;">+{{ record.finger.length - 3 }}</a-tag>
+            </a-popover>
           </div>
         </template>
 
@@ -312,7 +321,7 @@
         </template>
 
         <template v-else-if="column.key === 'finger_name'">
-          <span style="color: #00bcd4; cursor: pointer;">{{ record.name || '-' }}</span>
+          <span style="color: #00bcd4; cursor: pointer; text-decoration: underline;" @click="openFingerModal(record.name)">{{ record.name || '-' }}</span>
         </template>
 
         <template v-else-if="column.key === 'wih_source'">
@@ -321,25 +330,47 @@
           </div>
         </template>
 
-        <!-- 💡 新增：日志相关渲染 -->
-        <template v-else-if="column.key === 'syslog_level'">
-          <a-tag :color="record.level === 'error' ? 'red' : record.level === 'warning' ? 'orange' : record.level === 'success' ? 'green' : 'blue'">
-            {{ record.level || 'info' }}
-          </a-tag>
-        </template>
-        
-        <template v-else-if="column.key === 'syslog_message'">
-          <div style="background: #f5f5f5; padding: 8px; border-radius: 4px; font-family: monospace; white-space: pre-wrap; word-wrap: break-word; font-size: 13px;">
-            {{ record.message || '-' }}
-          </div>
-        </template>
-
       </template>
     </a-table>
 
-    <div v-if="tabConfig[activeTab]" style="display: flex; justify-content: space-between; align-items: center; padding: 0 16px;">
+    <!-- 指纹统计关联站点弹窗 -->
+    <a-modal v-model:open="fingerModalVisible" :title="`指纹关联站点：${currentFingerName}`" :footer="null" width="800px">
+      <a-table
+        :dataSource="fingerModalData"
+        :columns="fingerModalColumns"
+        :loading="fingerModalLoading"
+        :pagination="false"
+        size="small"
+        rowKey="_id"
+        :scroll="{ y: 400 }"
+      >
+        <template #bodyCell="{ column, record, index }">
+          <template v-if="column.key === 'index'">{{ index + 1 }}</template>
+          <template v-else-if="column.key === 'site'">
+            <a :href="record.site || record.url" target="_blank" style="color: #00bcd4;">{{ record.site || record.url }}</a>
+          </template>
+        </template>
+      </a-table>
+    </a-modal>
+
+    <div v-if="tabConfig[activeTab] && activeTab !== 'syslog'" style="display: flex; justify-content: space-between; align-items: center; padding: 0 16px;">
       <div style="color: rgba(0,0,0,.65);">共 {{ Math.ceil(pagination.total / pagination.pageSize) || 1 }} 页 / {{ pagination.total }} 条数据</div>
       <a-pagination v-model:current="pagination.current" v-model:pageSize="pagination.pageSize" :total="pagination.total" show-size-changer @change="handleTableChange" @showSizeChange="handleTableChange" />
+    </div>
+
+    <div v-show="activeTab === 'syslog'">
+      <div style="border: 1px solid #e8e8e8; border-radius: 4px; padding: 8px; background-color: #fafafa;">
+        <div ref="terminalContainer" style="background-color: #001529; color: #e6f7ff; font-family: 'Fira Code', Consolas, 'Courier New', monospace; padding: 16px; border-radius: 4px; height: 60vh; overflow-y: auto; font-size: 13px; line-height: 1.6; box-shadow: inset 0 2px 8px rgba(0,0,0,0.2);" @mouseenter="pauseScroll = true" @mouseleave="pauseScroll = false">
+          <div v-for="(log, idx) in dataSource" :key="log._id || log.id || idx" style="margin-bottom: 6px; word-break: break-all; border-bottom: 1px dashed rgba(255,255,255,0.1); padding-bottom: 4px;">
+            <span style="color: #00bcd4; margin-right: 8px;">[{{ log.create_time }}]</span>
+            <span :style="{ color: log.level === 'error' ? '#ff4d4f' : log.level === 'warning' ? '#faad14' : '#52c41a', fontWeight: 'bold', marginRight: '8px' }">[{{ (log.level || 'info').toUpperCase() }}]</span>
+            <span style="color: #1890ff; margin-right: 8px;" v-if="log.title">[{{ log.title }}]</span>
+            <span style="color: #e6f7ff;">{{ log.message }}</span>
+          </div>
+          <div v-if="dataSource.length === 0 && !loading" style="color: rgba(255,255,255,0.45); font-style: italic;">[System] 暂无日志记录... (等待日志生成)</div>
+          <div v-if="loading" style="color: rgba(255,255,255,0.45); font-style: italic;">[System] 正在拉取日志...</div>
+        </div>
+      </div>
     </div>
 
     <a-modal v-model:open="previewVisible" :footer="null" width="85vw" centered @cancel="previewVisible = false" :bodyStyle="{ padding: '16px' }">
@@ -384,7 +415,7 @@
 
 <script setup>
 // 💥 核心修改 2：引入 createVNode 和 Modal、ExclamationCircleOutlined
-import { ref, onMounted, reactive, watch, computed, createVNode, onUnmounted } from 'vue';
+import { ref, onMounted, reactive, watch, computed, createVNode, onUnmounted, nextTick } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import request from '../utils/request';
 import { message, Modal } from 'ant-design-vue';
@@ -393,10 +424,59 @@ import { SearchOutlined, ExclamationCircleOutlined } from '@ant-design/icons-vue
 const route = useRoute();
 const router = useRouter();
 const query = route?.query || {};
+
+// 弹窗状态与方法
+const fingerModalVisible = ref(false);
+const currentFingerName = ref('');
+const fingerModalData = ref([]);
+const fingerModalLoading = ref(false);
+
+const fingerModalColumns = [
+  { title: '序号', key: 'index', width: 60, align: 'center' },
+  { title: '站点 URL', key: 'site', width: 300 },
+  { title: '标题', key: 'title', dataIndex: 'title', width: 200 },
+  { title: '状态码', key: 'status_code', dataIndex: 'status_code', width: 100 }
+];
+
+const openFingerModal = async (fingerName) => {
+  currentFingerName.value = fingerName;
+  fingerModalVisible.value = true;
+  fingerModalLoading.value = true;
+  fingerModalData.value = [];
+  try {
+    const res = await request.get('/site/', {
+      params: {
+        task_id: query.task_id,
+        finger: fingerName,
+        page: 1,
+        size: 100
+      }
+    });
+    const rawItems = res.items || res.data?.items || [];
+    const uniqueItems = [];
+    const siteSet = new Set();
+    for (const item of rawItems) {
+      const siteUrl = item.site || item.url;
+      if (!siteSet.has(siteUrl)) {
+        siteSet.add(siteUrl);
+        uniqueItems.push(item);
+      }
+    }
+    fingerModalData.value = uniqueItems;
+  } catch (error) {
+    console.error('Fetch finger sites failed:', error);
+    message.error('获取关联站点失败');
+  } finally {
+    fingerModalLoading.value = false;
+  }
+};
 const targetName = ref(query.targetName || '未知目标');
 const activeTab = ref('site');
 const loading = ref(false);
 const dataSource = ref([]);
+
+const terminalContainer = ref(null);
+const pauseScroll = ref(false);
 
 // 弹窗状态
 const previewVisible = ref(false);
@@ -454,7 +534,7 @@ const tabConfig = {
       { title: '标题', dataIndex: 'title', key: 'title', width: 200 },
       // 删除了你加的 server 和 status 列
       { title: 'headers', key: 'headers',width: 500},
-      { title: 'finger', key: 'finger', width: 50 },
+      { title: 'finger', key: 'finger', width: 150 },
       { title: '截图', key: 'screenshot', width: 280 } // 保持宽度给图片留足空间
     ]
   },
@@ -779,6 +859,14 @@ const fetchData = async (isPolling = false) => {
       dataSource.value = res.items || [];
       pagination.total = res.total || 0;
       selectedRowKeys.value = [];
+      
+      if (activeTab.value === 'syslog' && !pauseScroll.value) {
+        nextTick(() => {
+          if (terminalContainer.value) {
+            terminalContainer.value.scrollTop = terminalContainer.value.scrollHeight;
+          }
+        });
+      }
     }
   } catch (error) {
     if (!isPolling) {
@@ -790,36 +878,6 @@ const fetchData = async (isPolling = false) => {
     }
   }
 };
-
-// 💡 新增：任务日志自动刷新机制
-let syslogTimer = null;
-
-const startSyslogTimer = () => {
-  if (syslogTimer) clearInterval(syslogTimer);
-  syslogTimer = setInterval(() => {
-    fetchData(true);
-  }, 3000); // 每 3 秒拉取一次最新日志
-};
-
-const stopSyslogTimer = () => {
-  if (syslogTimer) {
-    clearInterval(syslogTimer);
-    syslogTimer = null;
-  }
-};
-
-watch(activeTab, (newVal) => {
-  if (newVal === 'syslog') {
-    startSyslogTimer();
-  } else {
-    stopSyslogTimer();
-  }
-});
-
-// 其他生命周期与清理工作
-onUnmounted(() => {
-  stopSyslogTimer();
-});
 
 // ==========================================
 // 💥 导出站点：1:1 对齐导出纯文本文件流
@@ -929,19 +987,102 @@ const handleTableChange = (page, pageSize) => {
   fetchData();
 };
 
+// 💡 新增：任务日志自动刷新机制
+let syslogTimer = null;
+
+const startSyslogTimer = () => {
+  if (syslogTimer) clearInterval(syslogTimer);
+  syslogTimer = setInterval(() => {
+    fetchData(true);
+  }, 3000); // 每 3 秒拉取一次最新日志
+};
+
+const stopSyslogTimer = () => {
+  if (syslogTimer) {
+    clearInterval(syslogTimer);
+    syslogTimer = null;
+  }
+};
+
+// 💡 新增：全局任务状态轮询，用于实时更新 Tab 栏计数值
+let taskStatusTimer = null;
+
+const fetchTaskStats = async () => {
+  const taskId = query.task_id;
+  if (!taskId) return;
+  try {
+    const res = await request.get('/task/', { params: { _id: taskId } });
+    if (res.code === 200 && res.data && res.data.items && res.data.items.length > 0) {
+      const task = res.data.items[0];
+      const stat = task.statistic || {};
+      queryCounts.site = stat.site_cnt ?? task.site_cnt ?? 0;
+      queryCounts.domain = stat.domain_cnt ?? task.domain_cnt ?? 0;
+      queryCounts.ip = stat.ip_cnt ?? task.ip_cnt ?? 0;
+      queryCounts.cert = stat.cert_cnt ?? task.cert_cnt ?? 0;
+      queryCounts.service = stat.service_cnt ?? task.service_cnt ?? 0;
+      queryCounts.fileleak = stat.fileleak_cnt ?? task.fileleak_cnt ?? 0;
+      queryCounts.url = stat.url_cnt ?? task.url_cnt ?? 0;
+      queryCounts.vuln = stat.vuln_cnt ?? task.vuln_cnt ?? 0;
+      queryCounts.npoc_service = stat.npoc_service_cnt ?? task.npoc_service_cnt ?? 0;
+      queryCounts.cip = stat.cip_cnt ?? task.cip_cnt ?? 0;
+      queryCounts.nuclei_result = stat.nuclei_result_cnt ?? task.nuclei_result_cnt ?? 0;
+      queryCounts.stat_finger = stat.stat_finger_cnt ?? task.stat_finger_cnt ?? 0;
+      queryCounts.wih = stat.wih_cnt ?? task.wih_cnt ?? 0;
+
+      // 如果任务已结束，停止轮询
+      if (task.status === 'done' || task.status === 'error' || task.status === 'stop') {
+        stopTaskStatusTimer();
+      }
+    }
+  } catch (err) {
+    console.error('拉取任务全局状态失败:', err);
+  }
+};
+
+const startTaskStatusTimer = () => {
+  if (!query.task_id) return;
+  fetchTaskStats(); // 初始拉取一次
+  taskStatusTimer = setInterval(() => {
+    fetchTaskStats();
+  }, 5000); // 每 5 秒更新一次导航栏计数
+};
+
+const stopTaskStatusTimer = () => {
+  if (taskStatusTimer) {
+    clearInterval(taskStatusTimer);
+    taskStatusTimer = null;
+  }
+};
+
 watch(activeTab, (newVal) => {
   if (tabConfig[newVal]) {
     columns.value = tabConfig[newVal].cols;
     searchForm.value = {};
     pagination.current = 1;
+    if (newVal === 'syslog') {
+      pagination.pageSize = 500;
+      startSyslogTimer();
+    } else {
+      pagination.pageSize = 10;
+      stopSyslogTimer();
+    }
     fetchData();
   } else {
     dataSource.value = [];
     columns.value = [];
+    stopSyslogTimer();
   }
 });
 
-onMounted(fetchData);
+onMounted(() => {
+  fetchData();
+  startTaskStatusTimer();
+});
+
+onUnmounted(() => {
+  stopSyslogTimer();
+  stopTaskStatusTimer();
+});
 
 // ==========================================
 // 💥 风险任务下发：生成临时集合、拉取策略、下发任务

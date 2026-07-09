@@ -1,10 +1,24 @@
 <template>
   <div style="background-color: #fff; padding: 24px; min-height: calc(100vh - 64px);">
 
-    <div class="search-row" style="margin-bottom: 20px;">
+    <div style="margin-bottom: 16px; display: flex; gap: 8px; flex-wrap: wrap;">
       <a-button type="primary" style="background-color: #00bcd4; border-color: #00bcd4;" @click="openAddModal">添加指纹</a-button>
+      <a-upload
+          name="file"
+          :show-upload-list="false"
+          :customRequest="handleUpload"
+          accept=".json,.yaml,.yml"
+      >
+        <a-button type="primary" style="background-color: #00bcd4; border-color: #00bcd4;">上传指纹</a-button>
+      </a-upload>
 
-      <div class="search-item" style="margin-left: 16px;">
+      <a-button @click="handleSync" type="primary" style="background-color: #00bcd4; border-color: #00bcd4;" :loading="syncLoading">存储指纹</a-button>
+      <a-button @click="handleSyncFromJSON" type="primary" style="background-color: #00bcd4; border-color: #00bcd4;" :loading="syncFromJsonLoading">加载指纹</a-button>
+      <a-button @click="handleExport" type="primary" style="background-color: #00bcd4; border-color: #00bcd4;">一键导出</a-button>
+    </div>
+
+    <div class="search-row" style="margin-bottom: 20px; background-color: #f9f9f9; padding: 16px; border-radius: 4px;">
+      <div class="search-item">
         <span class="label">名称：</span>
         <a-input v-model:value="searchForm.name" placeholder="请输入名称进行搜索" style="width: 220px;" allowClear @pressEnter="onSearch">
           <template #suffix><search-outlined @click="onSearch" style="cursor: pointer; color: rgba(0,0,0,0.25);" /></template>
@@ -19,8 +33,7 @@
       </div>
     </div>
 
-    <div style="margin-bottom: 16px; display: flex; gap: 8px;">
-
+    <div style="margin-bottom: 16px;">
       <a-popconfirm
           title="确认删除所选数据吗？"
           ok-text="确认"
@@ -30,17 +43,6 @@
       >
         <a-button :disabled="!hasSelected">批量删除</a-button>
       </a-popconfirm>
-
-      <a-button @click="handleExport" type="primary" style="background-color: #52c41a; border-color: #52c41a;">一键全部导出</a-button>
-      <a-upload
-          name="file"
-          :show-upload-list="false"
-          :customRequest="handleUpload"
-          accept=".json,.yaml,.yml"
-      >
-        <a-button>上传指纹</a-button>
-      </a-upload>
-      <a-button @click="handleSync" type="primary" style="background-color: #faad14; border-color: #faad14;" :loading="syncLoading">同步到webapp.json</a-button>
     </div>
 
     <a-table
@@ -111,6 +113,7 @@ const dataSource = ref([]);
 const searchForm = reactive({ name: '', rule: '' });
 const pagination = reactive({ current: 1, pageSize: 10, total: 0 });
 const syncLoading = ref(false);
+const syncFromJsonLoading = ref(false);
 
 // 表格多选逻辑
 const selectedRowKeys = ref([]);
@@ -273,6 +276,25 @@ const handleSync = async () => {
     message.error('请求异常，同步失败');
   } finally {
     syncLoading.value = false;
+  }
+};
+// ================= 从 webapp.json 同步到 MongoDB =================
+const handleSyncFromJSON = async () => {
+  syncFromJsonLoading.value = true;
+  try {
+    const res = await request.post('/fingerprint/sync_from_json/');
+    if (res.code === 200) {
+      message.success(res.data?.msg || '同步成功！');
+      // 同步成功后自动重置到第一页并重新加载列表
+      pagination.current = 1;
+      fetchData();
+    } else {
+      message.error('同步失败: ' + res.message);
+    }
+  } catch (error) {
+    message.error('请求异常，同步失败');
+  } finally {
+    syncFromJsonLoading.value = false;
   }
 };
 // ================= 上传指纹逻辑 =================

@@ -10,10 +10,19 @@ class Query(DNSQueryBase):
 
     def sub_domains(self, target):
         url = "{}api/v1/indicators/domain/{}/passive_dns".format(self.api_url, target)
-        items = utils.http_req(url, 'get', timeout=(30.1, 50.1)).json()
+        try:
+            response = utils.http_req(url, 'get', timeout=(30.1, 50.1))
+            items = response.json()
+        except Exception as e:
+            self.logger.warning(f"AlienVault request/json error for {target}: {e}")
+            return []
+
         results = []
-        for item in items["passive_dns"]:
-            results.append(item["hostname"])
+        if isinstance(items, dict) and "passive_dns" in items:
+            for item in items.get("passive_dns", []):
+                hostname = item.get("hostname")
+                if hostname:
+                    results.append(hostname)
 
         return list(set(results))
 

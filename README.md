@@ -16,137 +16,127 @@
 
 ## 💡 什么是 ARL-Next？
 
-**ARL-Next** 是一款专为企业安全团队与红蓝对抗工程师打造的**下一代自动化资产侦察与漏洞监控平台**。
+**ARL-Next** 是 ARL (资产侦察灯塔) 的现代化重构版本，提供**极简、高效的自动化资产发现与漏洞监控方案**。其核心亮点包括：
 
-通过全栈容器化与现代化重构，它彻底告别了传统安全工具环境配置繁琐、部署困难的历史包袱。从资产拓扑发现、指纹识别到漏洞打点，ARL-Next 致力于提供**开箱即用、丝滑流畅**的全局安全态势感知体验。
-
-
-
-### 🌟 为什么要重构 ARL-Next？
-
-核心驱动力是**打造一个现代化、低门槛的二次开发 Baseline**：
-
-* **极简二开与 AI 友好（前端重构为主）**：全面拥抱 Vue 3。清晰解耦的代码结构，极大地降低了二次开发门槛，**非常适合直接由 AI 辅助进行功能魔改与研究**。
-* **底层引擎换代**：彻底淘汰已停更的 PhantomJS 等老旧组件，平滑迁移至 Chromium + Puppeteer，并升级最新漏洞引擎。
-* **开发环境解耦**：后端与中间件全面 Docker 化，前端本地独立运行。告别繁琐的依赖配置，开发者可 100% 聚焦业务逻辑本身。
+* **引擎代际更替**：淘汰 PhantomJS，平滑升级为 Chromium + Puppeteer 动态爬虫与最新的 Nuclei 漏洞扫描引擎。
+* **多维资产闭环**：打通“边界 ➔ 拓扑 ➔ 指纹 ➔ 漏洞”闭环，集成 ICP 与天眼查，支持拉取企业旗下 APP、小程序、公众号及微博等多元资产。
+* **部署与极速二开**：生产脚本支持环境自检与内核网络调优；开发环境支持代码卷挂载与 Vite 极速热更新，天然适配 AI 辅助开发。
 
 ---
 
 ## 📸 界面预览
 
-* **全局仪表盘**：直观展示资产与任务状态分布、近期日志,掌控全局安全态势。
+* **全局仪表盘**：实时展示系统资源消耗、任务执行队列、多维资产统计与后台运行日志流。
   <br><img src="./img/dashboard.png" alt="仪表盘" width="800"><br>
 
-* **ICP 备案查询**：内置ICP网站、APP、小程序、快应用查询工具，快速获取企业资产边界信息,支持一键同步资产自动下发资产采集、nuclei、POC策略。
-  <br><img src="./img/icp-query.png" alt="ICP备案查询" width="800"><br>
+* **企业资产查询**：支持 ICP 备案与天眼查关联检索，一键同步资产（网站/小程序/APP/公众号/微博）下发扫描任务。
+  <br><img src="./img/enterprise-asset-search.png" alt="ICP备案查询" width="800"><br>
 
-* **任务管理**：精细化的任务下发与状态追踪，支持多维度过滤。
-  <br><img src="./img/task-management.png" alt="任务管理" width="800"><br>
+* **任务管理**：支持扫描任务全生命周期追踪、POC 插件按需自由组合与多维资产拓扑过滤。
+  <br><img src="./img/task-new.png" alt="任务新建" width="800"><br>
+  <br><img src="./img/task-management1.png" alt="任务管理" width="800"><br>
 
-* **系统设置**：支持热更扫描配置、调整并发与通知推送。
+* **系统设置**：集成 Fofa/天眼查 API 热配置、字典云端热更新、扫描并发调度微调，以及五大告警通道（钉钉/飞书/企微/邮件/Webhook）一键测试。
   <br><img src="./img/system-settings.png" alt="系统设置" width="800"><br>
-
----
-
-## ✨ 核心特性
-
-* **Nuclei v3 漏洞引擎**：内置 Nuclei v3.3.0 及最新漏洞模板，支持分类扫描，并对接 FOFA 等第三方资产引擎，实现自动化漏洞探测。
-* **ICP 备案资产查询**：新增专属查询模块，在平台内即可直接查询目标企业 ICP 备案信息并落库，打通资产发现的起始环。
-* **全局可视化仪表盘**：全景监控资产总量（域名 / IP / 站点）、任务执行状态及系统实时负载，支持系统日志自动轮转。
-* **高度自定义系统设置**：支持在 Web 界面直接热更扫描字典、自定义端口探测范围，并可配置钉钉、飞书、企业微信等即时消息推送。
-* **统一 GitHub 监控面板**：将 GitHub 任务列表与监控列表合并为统一的管理界面，操作更直接高效。
 
 ---
 
 ## 🏗️ 架构设计
 
-ARL-Next 采用清晰的微服务架构设计，各模块职责明确：
+ARL-Next 采用前后端解耦的微服务架构，核心模块及版本如下：
 
-1. **展示层 (Frontend)**：基于 Vue 3 + Vite 构建，负责用户交互与数据可视化。
-2. **业务 API 层 (Backend)**：基于 Flask，负责接收前端指令、鉴权，并调度底层任务。
-3. **消息中间件 (Broker)**：采用 **RabbitMQ**，负责高效可靠地分发并解耦庞大的异步扫描任务。
-4. **异步执行层 (Workers)**：Celery 分布式集群（含普通 worker、github 监控、定时调度器），专门执行耗时的漏洞扫描和资产收集。
-5. **持久化存储 (Database)**：使用 **MongoDB**，承载海量扫描结果与大宽表资产数据的落地。
+1. **展示层 (Frontend)**：基于 **Vue 3.5** + **Vite 5.4** + **Ant Design Vue 4.2** 构建，生产环境由 **Nginx (Alpine)** 托管并提供 HTTPS 安全网关。
+2. **业务 API 层 (Backend)**：基于 **Python 3.8+** 与 **Flask 2.0**，处理 JWT 权限鉴定、网关分发与本地化备案查询微服务。
+3. **消息队列 (Broker)**：采用 **RabbitMQ 3.x**，实现 API 服务与异步高并发扫描任务之间的解耦分发。
+4. **任务执行层 (Workers)**：基于 **Celery 5.2** 的分布式集群（含普通任务 Worker 与 Celery Beat 定时调度），负责运行 **Nuclei 3.3** 与子域名爆破等底层任务。
+5. **数据存储 (Database)**：使用 **MongoDB 4.0**，承载千万级大宽表资产数据与漏洞结果落地。
 
 ---
 
 ## 🚀 部署指南
 
-### 方案 A：前端本地 + Docker 后端源码部署 (推荐开发者使用)
+### 开发环境部署：前端本地 + Docker 后端源码
 
-**适用场景**：调试前端 UI、修改后端接口逻辑。后端所有服务（核心 API / Celery Worker / Scheduler / 数据库 / 消息队列）运行在 Docker 中（**整库卷挂载，修改代码即时生效**），前端在本地以 Vite 开发服务器运行，通过代理透传请求。
+**适用**：二次开发人员、安全研究者。  
+**优势**：后端服务全栈容器化，通过代码卷（`./:/code`）实现源码即时热更；前端本地独立运行并反代请求，解耦彻底。
 
-> **前置条件**：已安装 [Docker Desktop](https://www.docker.com/products/docker-desktop/) 和 [Node.js](https://nodejs.org/)（附带 npm），并全局安装 pnpm：`npm install -g pnpm`
+> **前置条件**：安装 [Docker Desktop](https://www.docker.com/products/docker-desktop/)、[Node.js](https://nodejs.org/)，并配置 pnpm: `npm install -g pnpm`
 
 ---
 
-#### 第一步：构建并启动后端开发环境
+#### 🚀 启动步骤
 
 ```bash
-# 克隆代码
-git clone https://github.com/owl234/ARL-Next
-cd ARL-Next
+# 1. 克隆并进入项目目录
+git clone https://github.com/owl234/ARL-Next && cd ARL-Next
 
-# 首次构建后端开发镜像（内置所需底层引擎，耗时约 10~20 分钟）
-# 此后只要 Dockerfile.dev 不变，无需重复 build
-docker-compose -f docker-compose.dev.yml build arl-dev
-
-# 一键启动全部后台服务
-docker-compose -f docker-compose.dev.yml up -d
+# 2. 运行一键开发脚本（自动拉起后端容器、安装前端依赖并启动 Vite）
+bash start-dev.sh
 ```
+启动后，浏览器访问 `http://localhost:5173` 即可开始开发。
 
-> **说明**：
-> 1. `docker-compose.dev.yml` 会将本地项目目录挂载入容器，修改后端 Python 代码后，服务会自动热重载。
-> 2. 容器启动时会自动重置/注入默认管理员账号，账号密码为：`admin` / `arlpass`。
-> 3. 容器内的服务已为您自动映射好宿主机端口（API -> `5001`，Mongo -> `27018`，RabbitMQ -> `5673`），完全不影响本地环境。
+> 💡 **核心开发细节**：
+> * **双端热更新**：后端 Docker 挂载本地代码即时生效，前端由 Vite 极速热重载。
+> * **默认凭据**：系统管理员账号密码为：`admin` / `arlpass`。
+> * **API 代理**：后端接口暴露于宿主机 `5001` 端口，前端代理已预设反代至此端口。
+> * **本地 HTTPS**：若有安全限制，可将 `mkcert` 生成的 `localhost.pem` 与 `localhost-key.pem` 放入根目录 `certs/` 下，服务将自动以 `https://localhost:5173` 启动。
 
 ---
 
-#### 第二步：确认前端 API 代理配置
+#### 🛠️ 常用开发命令
 
-后端 API 默认映射到宿主机 `5001` 端口。请确认 `frontend/vite.config.js` 中的代理指向正确：
+```bash
+# 查看开发容器状态
+docker compose -f docker-compose.dev.yml ps
 
-```js
-// frontend/vite.config.js
-proxy: {
-  '/api': {
-    target: 'http://127.0.0.1:5001', 
-    changeOrigin: true,
-  }
-}
+# 实时查看 API 与 Worker 容器日志
+docker compose -f docker-compose.dev.yml logs -f arl-web arl-worker
+
+# 停止开发环境（保留数据卷）
+docker compose -f docker-compose.dev.yml down
 ```
 
 ---
 
-#### 第三步：启动前端开发服务器
+### 生产环境部署方案：公网极速一键部署 ( 推荐! )
+
+**适用场景**：国内云服务器、企业内网。
+
+> ⏱️ **裸机实测基准 (Benchmark)**：基于低配公网服务器（京东云 2核4G，5Mbps 带宽）进行**从零部署**（包含自动安装 Docker 环境与全量拉取镜像），总耗时仅 **13分 27秒**。若服务器已自带 Docker 环境，部署耗时将进一步压缩至 **2分钟** 内。
+
+**核心优势**：
+* **国内满速**：直连阿里云公开镜像库，告别下载卡顿。
+* **极致轻量**：剔除冗余编译链，镜像硬核减重超 700MB。
+* **免密零配置**：免账号登录、免环境配置、免 `docker login`。
+* **开箱即安全**：自动签发 10年期 SSL，核心组件全内网隔离。
+
+#### 🚀 极速部署 (仅需两步)
 
 ```bash
-cd frontend
+# 1. 获取最新源码（使用浅克隆拉取最新代码）
+git clone --depth 1 https://github.com/owl234/ARL-Next.git && cd ARL-Next
 
-# 首次安装依赖
-pnpm install
-
-# 启动 Vite 开发服务器（支持热重载）
-pnpm run dev
+# 2. 一键拉起环境（自动拉取超小镜像与配置 SSL）
+sudo bash start-prod.sh
 ```
+部署成功后，通过浏览器访问 `https://your-server-ip:5173` 即可登录。
 
-启动后访问控制台打印的本地地址（默认 `http://localhost:5173`，若端口占用则顺延）即可登录系统。
+*(注：首次访问由于是自签名证书会提示“不安全”，点击浏览器“高级 -> 继续访问”即可)*
 
-> **HTTPS 证书（可选）**：如需开启 HTTPS 以避免浏览器的各种安全拦截（如 Web Worker 限制等），可使用 `mkcert localhost` 生成本地证书，并将 `localhost.pem` 与 `localhost-key.pem` 放置于项目根目录 `certs/` 下，Vite 开发服务器检测到后会自动读取并开启 HTTPS (`https://localhost:5173`)。
+> ⚙️ **自定义受信任证书**：如有商业 SSL 证书，将其改名为 `arl.crt` 和 `arl.key` 放入 `./ssl-certs/` 目录，再执行一遍 `start-prod.sh` 即可生效。
 
----
 
-#### 常用开发管理命令
 
+#### 常用生产管理命令
 ```bash
-# 查看所有容器状态
-docker-compose -f docker-compose.dev.yml ps
+# 查看生产环境所有容器状态
+docker compose -f docker-compose.prod.yml ps
 
-# 实时查看后端主服务（API、Worker、定时任务）的混合日志
-docker-compose -f docker-compose.dev.yml logs -f arl-dev
+# 实时查看生产环境 Web 和 Worker 容器的运行日志（基于服务名）
+docker compose -f docker-compose.prod.yml logs -f arl-web arl-worker
 
-# 停止开发环境（不丢失数据）
-docker-compose -f docker-compose.dev.yml down
+# 停止生产环境容器（数据会持久化在 volume 中，不会丢失）
+docker compose -f docker-compose.prod.yml down
 ```
 
 ---
@@ -158,8 +148,10 @@ docker-compose -f docker-compose.dev.yml down
 **MongoDB 核心数据库**
 * **Host:** `127.0.0.1`
 * **Port:** `27018`
-* **认证库 (Database):** `admin`
-*(业务数据均存储在 `arl` 数据库中)*
+* **认证库 (authSource):** `admin` （存储账号凭据的安全验证库）
+* **认证账号/密码:** `admin` / `admin`
+* **业务数据存储库:** `arl` （直连后实际操作该库获取资产数据）
+* **直连 URI**: `mongodb://admin:admin@127.0.0.1:27018/arl?authSource=admin`
 
 **RabbitMQ 消息队列**
 * **Host:** `127.0.0.1`
@@ -176,10 +168,14 @@ docker-compose -f docker-compose.dev.yml down
 
 ## 🤝 致谢
 
-* **ARL-Next** 是基于开源项目 [ARL (Asset Reconnaissance Lighthouse) 资产侦察灯塔](https://github.com/TophantTechnology/ARL) 进行重构与二次开发的增强版本。
-* 本项目集成的 **ICP 备案资产查询** 模块，是基于优秀的开源项目 [ICP_Query](https://github.com/HG-ha/ICP_Query) 进行的二次开发。
+* **ARL-Next** 核心引擎是基于开源项目 [ARL (Asset Reconnaissance Lighthouse) 资产侦察灯塔](https://github.com/TophantTechnology/ARL) 进行现代化重构的增强版本。
+* 本项目集成的 **企业资产查询 (ICP 等)** 模块，其核心逻辑基于优秀的开源项目 [ICP_Query](https://github.com/HG-ha/ICP_Query) 进行二次开发。
+* **威零安全团队** (<img src="img/weiling.jpg" width="18" height="18" align="absmiddle" /> 微信公众号)：提供了 16,985 条指纹数据，极大丰富了本项目的资产指纹识别维度。
+* 在二次开发和重构的过程中，本项目也参考并借鉴了以下优秀的 ARL 衍生开源项目：
+  * [Aabyss-Team/ARL](https://github.com/Aabyss-Team/ARL)
+  * [adysec/ARL](https://github.com/adysec/ARL)
 
-我们对原 ARL 开发团队以及 ICP_Query 作者为信息安全开源社区做出的巨大贡献表示最诚挚的感谢！本着开源互助的精神，ARL-Next 将继续遵循开源精神。
+我们对上述开源项目作者、安全团队及社区贡献者表示最诚挚的感谢！ARL-Next 也将秉持开源互助的初心，持续为信息安全社区贡献力量。
 
 ---
 
@@ -194,13 +190,19 @@ docker-compose -f docker-compose.dev.yml down
 
 在使用过程中如遇到 Bug、有新的功能建议，或是想探讨安全开发与红蓝对抗技术，欢迎通过 GitHub Issues 提交反馈。
 
-同时也欢迎通过以下微信与我联系交流：
+同时也欢迎通过以下方式与我联系交流：
 
-<div align="center">
+<table align="center">
+  <tr>
+    <td align="center" style="padding: 0 60px;"><b>个人微信</b></td>
+    <td align="center" style="padding: 0 60px;"><b>QQ交流群</b></td>
+  </tr>
+  <tr>
+    <td align="center" style="padding: 0 60px;"><img src="./img/wechat.png" alt="个人微信" height="525" /></td>
+    <td align="center" style="padding: 0 60px;"><img src="./img/qq_group.jpg" alt="QQ交流群" height="525" /></td>
+  </tr>
+</table>
 
-<img src="./img/wechat.png" alt="WeChat Contact" width="500">
-
-</div>
 
 ---
 
@@ -210,12 +212,14 @@ docker-compose -f docker-compose.dev.yml down
 
 <div align="center">
 
-<a href="https://github.com/owl234/arl-next/stargazers">
-  <img src="https://img.shields.io/github/stars/owl234/arl-next?style=for-the-badge&logo=github&logoColor=white&label=Stars&color=FFD700&labelColor=1a1a2e" alt="GitHub Stars">
+<a href="https://www.star-history.com/?repos=owl234%2Farl-next&type=date&legend=top-left">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=owl234/arl-next&type=date&theme=dark&legend=top-left&sealed_token=vNF3XBBUYjnOkZ1XfTODaJEURB73qlNr1zXyCH6HOUbJGKju3QmIb7pVDyjCK67Ra-ukzG7dgZ3B3HDpCKJ3raveN9bOCec7r6gDILhjGrYbcVEV2Gy5Ew" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=owl234/arl-next&type=date&legend=top-left&sealed_token=vNF3XBBUYjnOkZ1XfTODaJEURB73qlNr1zXyCH6HOUbJGKju3QmIb7pVDyjCK67Ra-ukzG7dgZ3B3HDpCKJ3raveN9bOCec7r6gDILhjGrYbcVEV2Gy5Ew" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=owl234/arl-next&type=date&legend=top-left&sealed_token=vNF3XBBUYjnOkZ1XfTODaJEURB73qlNr1zXyCH6HOUbJGKju3QmIb7pVDyjCK67Ra-ukzG7dgZ3B3HDpCKJ3raveN9bOCec7r6gDILhjGrYbcVEV2Gy5Ew" />
+ </picture>
 </a>
 
-<br/>
-
-[![Star History Chart](https://api.star-history.com/svg?repos=owl234/arl-next&type=Date)](https://star-history.com/#owl234/arl-next&Date)
-
 </div>
+
+
