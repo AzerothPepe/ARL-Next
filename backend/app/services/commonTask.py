@@ -279,10 +279,6 @@ class WebSiteFetch(object):
                 if record.content in self.wih_domain_set:
                     return
 
-                # 已经保存的域名，不再保存
-                if record.content in self.wih_domain_set:
-                    return
-
                 self.wih_domain_set.add(record.content)
 
     def run_web_info_hunter(self):
@@ -337,7 +333,7 @@ class WebSiteFetch(object):
 
 def domain_in_scope_domain(domain: str, scope_domain: list):
     for scope in scope_domain:
-        if domain.endswith("." + scope):
+        if domain == scope or domain.endswith("." + scope):
             return True
     return False
 

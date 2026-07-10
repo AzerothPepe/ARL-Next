@@ -1,9 +1,33 @@
 <template>
-  <div style="background-color: #fff; padding: 24px; min-height: calc(100vh - 64px);">
-    <a-tabs v-model:activeKey="activeTab" type="card">
+  <div style="background-color: #f0f2f5; padding: 24px; min-height: calc(100vh - 64px);">
+    
+    <!-- 全局 Token 状态提示 -->
+    <a-alert
+      v-if="tokenStatus.status"
+      :type="tokenStatus.status === 'valid' ? 'success' : 'error'"
+      show-icon
+      style="margin-bottom: 16px;"
+    >
+      <template #message>
+        <span style="font-weight: 500;">
+          GitHub Token 状态: 
+          <span v-if="tokenStatus.status === 'valid'" style="color: #52c41a;">{{ tokenStatus.msg }}</span>
+          <span v-else style="color: #f5222d;">{{ tokenStatus.msg }}</span>
+        </span>
+      </template>
+      <template #description v-if="tokenStatus.status !== 'valid'">
+        <div style="margin-top: 4px;">当前模块（包含代码泄露监控、CVE、武器库追踪等）强依赖 GitHub Token，请前往【系统设置】配置有效 Token，否则可能会被封禁 IP 或无法正常抓取。</div>
+      </template>
+    </a-alert>
+
+    <a-tabs v-model:activeKey="mainTab" type="card" class="main-tabs" size="large">
       
-      <!-- ================= Tab 1: 监控策略管理 (原GitHub监控) ================= -->
-      <a-tab-pane key="scheduler" tab="监控策略管理">
+      <!-- ================= MAIN TAB 1: 代码泄露监控 (防守侧) ================= -->
+      <a-tab-pane key="dlp" tab="🛡️ 代码泄露监控">
+        <a-card :bordered="false" style="border-radius: 8px;">
+          <a-tabs v-model:activeKey="activeTabDlp">
+            <!-- 子 Tab 1: 周期策略管理 -->
+            <a-tab-pane key="scheduler" tab="周期策略管理">
         <div style="margin-bottom: 20px; display: flex; justify-content: space-between;">
           <a-button type="primary" style="background-color: #00bcd4; border-color: #00bcd4;" @click="openSchedulerAdd">添加策略</a-button>
           <a-button type="dashed" @click="fetchSchedulerData">
@@ -105,8 +129,8 @@
         </div>
       </a-tab-pane>
 
-      <!-- ================= Tab 2: 扫描任务实例 (原GitHub管理) ================= -->
-      <a-tab-pane key="task" tab="扫描任务实例">
+      <!-- 子 Tab 2: 单次扫描任务 -->
+      <a-tab-pane key="task" tab="单次扫描任务">
         <div style="margin-bottom: 20px; display: flex; justify-content: space-between;">
           <a-button type="primary" style="background-color: #00bcd4; border-color: #00bcd4;" @click="openTaskAdd">新建单次任务</a-button>
           <a-button type="dashed" @click="fetchTaskData">
@@ -189,6 +213,13 @@
               <a-button
                   size="small"
                   style="margin-right: 8px;"
+                  type="primary" ghost
+                  @click="handleTaskRestart(record)"
+              >重启</a-button>
+
+              <a-button
+                  size="small"
+                  style="margin-right: 8px;"
                   :disabled="record.status === 'done' || record.status === 'error'"
                   @click="handleTaskSingleAction('stop', record._id)"
               >停止</a-button>
@@ -207,6 +238,274 @@
         </div>
       </a-tab-pane>
     </a-tabs>
+  </a-card>
+</a-tab-pane>
+
+<!-- ================= MAIN TAB 2: 威胁情报雷达 (情报侧) ================= -->
+<a-tab-pane key="ti" tab="📡 威胁情报雷达">
+  <a-card :bordered="false" style="border-radius: 8px;">
+    
+    <!-- 顶部概览栏 -->
+    <a-row :gutter="16" style="margin-bottom: 24px;">
+      <a-col :span="8">
+        <a-card size="small" style="background: linear-gradient(135deg, #e0f7fa 0%, #b2ebf2 100%); border:none; border-radius:8px;">
+          <a-statistic title="今日捕获 CVE" :value="cveData.length" style="margin-top: 8px">
+            <template #prefix><alert-outlined style="color: #00bcd4;" /></template>
+          </a-statistic>
+        </a-card>
+      </a-col>
+      <a-col :span="8">
+        <a-card size="small" style="background: linear-gradient(135deg, #f3e5f5 0%, #e1bee7 100%); border:none; border-radius:8px;">
+          <a-statistic title="监控武器库总数" :value="toolsData.length" style="margin-top: 8px">
+            <template #prefix><tool-outlined style="color: #8e24aa;" /></template>
+          </a-statistic>
+        </a-card>
+      </a-col>
+      <a-col :span="8">
+        <a-card size="small" style="background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%); border:none; border-radius:8px;">
+          <a-statistic title="追踪黑客总数" :value="hackersData.length" style="margin-top: 8px">
+            <template #prefix><team-outlined style="color: #43a047;" /></template>
+          </a-statistic>
+        </a-card>
+      </a-col>
+    </a-row>
+
+    <a-tabs v-model:activeKey="activeTabTi">
+      <a-tab-pane key="cve_history" tab="🚨 CVE 漏洞雷达">
+        <div style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; background: #fafafa; padding: 12px 16px; border-radius: 6px;">
+          <div style="display: flex; align-items: center; gap: 16px;">
+            <div>
+              <span style="margin-right: 8px;">定时开启:</span>
+              <a-switch v-model:checked="cveConfig.enabled" @change="saveCveConfig" />
+            </div>
+            <div v-if="cveConfig.enabled">
+              <span style="margin-right: 8px;">抓取频率:</span>
+              <a-select v-model:value="cveConfig.interval" style="width: 120px" @change="saveCveConfig">
+                <a-select-option :value="6">每 6 小时</a-select-option>
+                <a-select-option :value="12">每 12 小时</a-select-option>
+                <a-select-option :value="24">每 24 小时</a-select-option>
+              </a-select>
+            </div>
+            <a-button type="primary" ghost @click="runCveOnce" :loading="cveRunLoading">立刻扫描一次</a-button>
+          </div>
+          <a-button type="dashed" @click="fetchCveData">
+            <template #icon><sync-outlined /></template> 刷新数据
+          </a-button>
+        </div>
+
+        <!-- CVE搜索栏 -->
+        <div class="search-row" style="margin-bottom: 16px; background-color: #f9f9f9; padding: 16px; border-radius: 4px;">
+          <div class="search-item">
+            <span class="label">CVE 编号：</span>
+            <a-input v-model:value="cveSearchForm.cve_name" placeholder="请输入 CVE 编号" style="width: 180px;" allowClear />
+          </div>
+          <div class="search-item">
+            <span class="label">描述：</span>
+            <a-input v-model:value="cveSearchForm.desc" placeholder="请输入描述" style="width: 180px;" allowClear />
+          </div>
+        </div>
+
+        <div style="margin-bottom: 16px; display: flex; gap: 8px;">
+          <a-popconfirm title="确认删除所选记录吗？" @confirm="handleCveBatchDelete">
+            <a-button :disabled="!cveHasSelected">批量删除</a-button>
+          </a-popconfirm>
+        </div>
+        <a-table :row-selection="{ selectedRowKeys: cveSelectedRowKeys, onChange: onCveSelectChange }" :loading="cveLoading" :dataSource="filteredCveData" :columns="cveColumns" :pagination="{ pageSize: 15 }" size="middle" rowKey="cve_name">
+          <template #bodyCell="{ column, record }">
+            <template v-if="column.key === 'cve_name'">
+              <a :href="record.cve_url" target="_blank" style="color: #d32f2f; font-weight: bold; font-size: 15px;">
+                {{ record.cve_name }} <link-outlined />
+              </a>
+            </template>
+            <template v-else-if="column.key === 'desc'">
+              <a-typography-paragraph :ellipsis="{ rows: 2, expandable: true, symbol: '展开' }" style="margin-bottom: 0;">
+                {{ record.desc }}
+              </a-typography-paragraph>
+            </template>
+            <template v-else-if="column.key === 'action'">
+              <a-popconfirm title="确认删除？" @confirm="handleCveDelete(record.cve_name)">
+                <a-button size="small" danger>删除</a-button>
+              </a-popconfirm>
+            </template>
+          </template>
+        </a-table>
+      </a-tab-pane>
+
+      <!-- 子 Tab 2: 武器库追踪 -->
+      <a-tab-pane key="tools_target" tab="🛠️ 武器库追踪">
+        <div style="margin-bottom: 20px; display: flex; justify-content: space-between;">
+          <div style="display: flex; gap: 16px; align-items: center;">
+            <a-button type="primary" style="background-color: #00bcd4; border-color: #00bcd4;" @click="openToolAdd">添加工具监控</a-button>
+            <a-button type="primary" ghost @click="runToolsOnce">立刻扫描一次</a-button>
+            
+            <div style="display: flex; align-items: center; gap: 8px; background: #fafafa; padding: 4px 12px; border-radius: 4px; border: 1px solid #f0f0f0;">
+              <span>开启监控:</span>
+              <a-switch v-model:checked="toolsConfig.enabled" @change="saveToolsConfig" />
+            </div>
+            
+            <div v-if="toolsConfig.enabled" style="display: flex; align-items: center; gap: 8px; background: #fafafa; padding: 4px 12px; border-radius: 4px; border: 1px solid #f0f0f0;">
+              <span>周期策略:</span>
+              <a-select v-model:value="toolsConfig.interval" style="width: 120px" @change="saveToolsConfig">
+                <a-select-option :value="1">每 1 小时</a-select-option>
+                <a-select-option :value="2">每 2 小时</a-select-option>
+                <a-select-option :value="6">每 6 小时</a-select-option>
+                <a-select-option :value="12">每 12 小时</a-select-option>
+                <a-select-option :value="24">每天一次</a-select-option>
+              </a-select>
+            </div>
+          </div>
+          <a-button type="dashed" @click="fetchToolsData">
+            <template #icon><sync-outlined /></template>
+            刷新列表
+          </a-button>
+        </div>
+
+        <!-- 武器库搜索栏 -->
+        <div class="search-row" style="margin-bottom: 16px; background-color: #f9f9f9; padding: 16px; border-radius: 4px;">
+          <div class="search-item">
+            <span class="label">工具URL：</span>
+            <a-input v-model:value="toolsSearchForm.repo_url" placeholder="请输入工具URL" style="width: 250px;" allowClear />
+          </div>
+        </div>
+
+        <div style="margin-bottom: 16px; display: flex; gap: 8px;">
+          <a-popconfirm title="确认删除所选工具吗？" @confirm="handleToolsBatchDelete">
+            <a-button :disabled="!toolsHasSelected">批量删除</a-button>
+          </a-popconfirm>
+        </div>
+
+        <a-table :row-selection="{ selectedRowKeys: toolsSelectedRowKeys, onChange: onToolsSelectChange }" :loading="toolsLoading" :dataSource="filteredToolsData" :columns="toolsColumns" :pagination="true" size="middle" rowKey="repo_url">
+          <template #bodyCell="{ column, record }">
+            <template v-if="column.key === 'repo_url'">
+              <a :href="record.repo_url.replace('api.github.com/repos', 'github.com')" target="_blank" style="color: #1976d2; font-weight: 500;">
+                {{ record.repo_url.split('/').pop() }} <link-outlined />
+              </a>
+              <div style="color: #999; font-size: 12px;">{{ record.repo_url }}</div>
+            </template>
+            <template v-else-if="column.key === 'last_tag'">
+              <a-tag color="cyan" v-if="record.last_tag">{{ record.last_tag }}</a-tag>
+              <span v-else style="color: #ccc;">暂无版本</span>
+            </template>
+            <template v-else-if="column.key === 'action'">
+              <a :href="record.repo_url.replace('api.github.com/repos', 'github.com')" target="_blank">
+                <a-button size="small" type="primary" ghost style="margin-right: 8px;">查看</a-button>
+              </a>
+              <a-popconfirm title="确认取消监控该工具？" @confirm="handleToolDelete(record.repo_url)">
+                <a-button size="small" danger>删除</a-button>
+              </a-popconfirm>
+            </template>
+          </template>
+        </a-table>
+      </a-tab-pane>
+
+      <!-- 子 Tab 3: 黑客动态监测 -->
+      <a-tab-pane key="hackers_target" tab="👨‍💻 黑客动态监测">
+        <div style="margin-bottom: 20px; display: flex; justify-content: space-between;">
+          <div style="display: flex; gap: 16px; align-items: center;">
+            <a-button type="primary" style="background-color: #00bcd4; border-color: #00bcd4;" @click="openHackerAdd">添加大佬监控</a-button>
+            <a-button type="primary" ghost @click="runHackersOnce">立刻扫描一次</a-button>
+            
+            <div style="display: flex; align-items: center; gap: 8px; background: #fafafa; padding: 4px 12px; border-radius: 4px; border: 1px solid #f0f0f0;">
+              <span>开启监控:</span>
+              <a-switch v-model:checked="hackersConfig.enabled" @change="saveHackersConfig" />
+            </div>
+            
+            <div v-if="hackersConfig.enabled" style="display: flex; align-items: center; gap: 8px; background: #fafafa; padding: 4px 12px; border-radius: 4px; border: 1px solid #f0f0f0;">
+              <span>周期策略:</span>
+              <a-select v-model:value="hackersConfig.interval" style="width: 120px" @change="saveHackersConfig">
+                <a-select-option :value="1">每 1 小时</a-select-option>
+                <a-select-option :value="2">每 2 小时</a-select-option>
+                <a-select-option :value="6">每 6 小时</a-select-option>
+                <a-select-option :value="12">每 12 小时</a-select-option>
+                <a-select-option :value="24">每天一次</a-select-option>
+              </a-select>
+            </div>
+          </div>
+          <div style="display: flex; gap: 16px;">
+            <a-button style="border-color: #fadb14; color: #faad14;" @click="openHackersHistoryDrawer">
+              <template #icon>👀</template> 查看所有发现记录
+            </a-button>
+            <a-button type="dashed" @click="fetchHackersData">
+              <template #icon><sync-outlined /></template>
+              刷新列表
+            </a-button>
+          </div>
+        </div>
+
+        <!-- 黑客搜索栏 -->
+        <div class="search-row" style="margin-bottom: 16px; background-color: #f9f9f9; padding: 16px; border-radius: 4px;">
+          <div class="search-item">
+            <span class="label">Github ID：</span>
+            <a-input v-model:value="hackersSearchForm.github_id" placeholder="请输入 Github ID" style="width: 180px;" allowClear />
+          </div>
+        </div>
+
+        <div style="margin-bottom: 16px; display: flex; gap: 8px;">
+          <a-popconfirm title="确认删除所选大佬吗？" @confirm="handleHackersBatchDelete">
+            <a-button :disabled="!hackersHasSelected">批量删除</a-button>
+          </a-popconfirm>
+        </div>
+
+        <a-table :row-selection="{ selectedRowKeys: hackersSelectedRowKeys, onChange: onHackersSelectChange }" :loading="hackersLoading" :dataSource="filteredHackersData" :columns="hackersColumns" :pagination="true" size="middle" rowKey="github_id">
+          <template #emptyText>
+            <div style="padding: 40px 0;">
+              <inbox-outlined style="font-size: 48px; color: #d9d9d9;" />
+              <div style="color: #999; margin-top: 8px;">暂无监控大佬</div>
+              <a-button type="link" @click="hackerForm.github_id = 'knownsec'; submitHackerModal()">一键添加 knownsec</a-button>
+            </div>
+          </template>
+          <template #bodyCell="{ column, record }">
+            <template v-if="column.key === 'github_id'">
+              <div style="display: flex; align-items: center; gap: 12px;">
+                <a-avatar :src="`https://github.com/${(record.github_id || '').trim()}.png`" size="large" />
+                <a :href="`https://github.com/${(record.github_id || '').trim()}`" target="_blank" style="font-weight: 500; font-size: 15px;">
+                  {{ record.github_id }} <link-outlined />
+                </a>
+              </div>
+            </template>
+            <template v-if="column.key === 'found_count'">
+              <a-badge :count="record.found_count" :number-style="{ backgroundColor: '#52c41a' }" show-zero />
+            </template>
+            <template v-if="column.key === 'action'">
+              <a :href="`https://github.com/${record.github_id}`" target="_blank">
+                <a-button size="small" type="primary" ghost style="margin-right: 8px;">主页</a-button>
+              </a>
+              <a-popconfirm title="确认取消监控？" @confirm="handleHackerDelete(record.github_id)">
+                <a-button size="small" danger>删除</a-button>
+              </a-popconfirm>
+            </template>
+          </template>
+        </a-table>
+      </a-tab-pane>
+    </a-tabs>
+  </a-card>
+</a-tab-pane>
+
+
+
+    </a-tabs>
+
+    <!-- ================= 黑客发现记录抽屉 ================= -->
+    <a-drawer
+      title="👀 全网大佬工具发现记录"
+      placement="right"
+      :width="600"
+      :open="historyDrawerVisible"
+      @close="closeHackersHistoryDrawer"
+    >
+      <a-table :loading="historyLoading" :dataSource="hackersHistoryData" :columns="historyColumns" :pagination="true" size="middle" rowKey="full_name">
+        <template #bodyCell="{ column, record }">
+          <template v-if="column.key === 'full_name'">
+            <a :href="`https://github.com/${record.full_name}`" target="_blank" style="font-weight: 500; color: #1976d2;">
+              {{ record.full_name }} <link-outlined />
+            </a>
+          </template>
+          <template v-else-if="column.key === 'insert_time'">
+            <span style="color: #666;"><clock-circle-outlined /> {{ record.insert_time }}</span>
+          </template>
+        </template>
+      </a-table>
+    </a-drawer>
 
     <!-- ================= 策略弹窗 (新增/修改) ================= -->
     <a-modal
@@ -256,6 +555,40 @@
       </a-form>
     </a-modal>
 
+    <!-- ================= 工具新增弹窗 ================= -->
+    <a-modal
+        v-model:open="toolModalVisible"
+        title="添加工具监控"
+        @ok="submitToolModal"
+        width="520px"
+        okText="确定"
+        cancelText="取消"
+        destroyOnClose
+    >
+      <a-form :model="toolForm" :label-col="{ span: 5 }" :wrapper-col="{ span: 18 }" style="margin-top: 20px;">
+        <a-form-item label="仓库 URL" required>
+          <a-input v-model:value="toolForm.repo_url" placeholder="如 https://github.com/chaitin/xray" />
+        </a-form-item>
+      </a-form>
+    </a-modal>
+
+    <!-- ================= 大佬新增弹窗 ================= -->
+    <a-modal
+        v-model:open="hackerModalVisible"
+        title="添加大佬监控"
+        @ok="submitHackerModal"
+        width="520px"
+        okText="确定"
+        cancelText="取消"
+        destroyOnClose
+    >
+      <a-form :model="hackerForm" :label-col="{ span: 5 }" :wrapper-col="{ span: 18 }" style="margin-top: 20px;">
+        <a-form-item label="Github ID" required>
+          <a-input v-model:value="hackerForm.github_id" placeholder="如 knownsec" />
+        </a-form-item>
+      </a-form>
+    </a-modal>
+
   </div>
 </template>
 
@@ -263,29 +596,45 @@
 import { ref, reactive, onMounted, computed, watch } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import request from '../utils/request';
-import { message } from 'ant-design-vue';
-import { SearchOutlined, InboxOutlined, SyncOutlined } from '@ant-design/icons-vue';
+import { message, Modal } from 'ant-design-vue';
+import { SearchOutlined, InboxOutlined, SyncOutlined, LinkOutlined, AlertOutlined, ToolOutlined, TeamOutlined, InfoCircleOutlined, ClockCircleOutlined } from '@ant-design/icons-vue';
 
 const router = useRouter();
 const route = useRoute();
-const activeTab = ref('scheduler');
+const mainTab = ref('dlp');
+const activeTabDlp = ref('scheduler');
+const activeTabTi = ref('cve_history');
 
 // 💡 优先识别 URL 中传过来的参数（例如 dashboard 跳转过来默认指向对应 Tab）
 onMounted(() => {
   if (route.query.tab === 'task') {
-    activeTab.value = 'task';
+    mainTab.value = 'dlp';
+    activeTabDlp.value = 'task';
+  } else if (route.query.tab && ['cve_history', 'tools_target', 'hackers_target'].includes(route.query.tab)) {
+    mainTab.value = 'ti';
+    activeTabTi.value = route.query.tab;
   }
   fetchSchedulerData();
   fetchTaskData();
+  fetchToolsData();
+  fetchHackersData();
+  fetchCveData();
+  fetchCveConfig();
+  fetchToolsConfig();
+  fetchHackersConfig();
+  fetchTokenStatus();
 });
 
-// 监听 Tab 切换，按需重新拉取
-watch(activeTab, (newTab) => {
-  if (newTab === 'scheduler') {
-    fetchSchedulerData();
-  } else {
-    fetchTaskData();
-  }
+// 监听内部 Tab 切换拉取数据
+watch(activeTabDlp, (newTab) => {
+  if (newTab === 'scheduler') fetchSchedulerData();
+  else if (newTab === 'task') fetchTaskData();
+});
+
+watch(activeTabTi, (newTab) => {
+  if (newTab === 'cve_history') fetchCveData();
+  else if (newTab === 'tools_target') fetchToolsData();
+  else if (newTab === 'hackers_target') fetchHackersData();
 });
 
 
@@ -445,7 +794,14 @@ const fetchTaskData = async () => {
 
     const res = await request.get('/github_task/', { params });
     if (res.code === 200) {
-      taskData.value = res.items || [];
+      taskData.value = (res.items || []).map(item => {
+        if (item.statistic && item.statistic.github_result_cnt !== undefined) {
+          item.result_count = item.statistic.github_result_cnt;
+        } else if (!item.result_count) {
+          item.result_count = 0;
+        }
+        return item;
+      });
       taskPagination.total = res.total || 0;
       taskSelectedRowKeys.value = [];
     }
@@ -486,6 +842,20 @@ const handleTaskSingleAction = (type, id) => performTaskAction(type, [id]);
 const handleTaskBatchDelete = () => performTaskAction('delete', taskSelectedRowKeys.value);
 const handleTaskBatchStop = () => performTaskAction('stop', taskSelectedRowKeys.value);
 
+const handleTaskRestart = async (record) => {
+  try {
+    const res = await request.post('/github_task/', { name: record.name, keyword: record.keyword });
+    if (res.code === 200) {
+      message.success('重启任务成功 (已下发新任务)！');
+      onTaskSearch();
+    } else {
+      message.error('重启失败: ' + res.message);
+    }
+  } catch (error) {
+    message.error('请求异常');
+  }
+};
+
 // 新增任务弹窗
 const taskModalVisible = ref(false);
 const taskSubmitLoading = ref(false);
@@ -515,6 +885,419 @@ const submitTaskModal = async () => {
     message.error('请求异常');
   } finally {
     taskSubmitLoading.value = false;
+  }
+};
+
+// ==========================================
+// 🛠️ 模块 C: 红队工具监控 (github_tools_target)
+// ==========================================
+const toolsLoading = ref(false);
+const toolsData = ref([]);
+
+const toolsSearchForm = reactive({ repo_url: '' });
+const filteredToolsData = computed(() => {
+  return toolsData.value.filter(item => {
+    if (toolsSearchForm.repo_url && !item.repo_url.toLowerCase().includes(toolsSearchForm.repo_url.toLowerCase())) return false;
+    return true;
+  });
+});
+const toolsSelectedRowKeys = ref([]);
+const toolsHasSelected = computed(() => toolsSelectedRowKeys.value.length > 0);
+const onToolsSelectChange = (keys) => { toolsSelectedRowKeys.value = keys; };
+
+const handleToolsBatchDelete = async () => {
+  const res = await request.post('/github_threat/tools_target/delete', { repo_urls: toolsSelectedRowKeys.value });
+  if (res.code === 200) {
+    message.success('批量删除成功');
+    toolsSelectedRowKeys.value = [];
+    fetchToolsData();
+  } else {
+    message.error(res.message);
+  }
+};
+
+const toolModalVisible = ref(false);
+const toolForm = reactive({ repo_url: '' });
+
+const toolsColumns = [
+  { title: '工具名称 / URL', dataIndex: 'repo_url', key: 'repo_url', width: 350 },
+  { title: '最新版本', dataIndex: 'last_tag', key: 'last_tag', width: 120 },
+  { title: '发布时间', dataIndex: 'last_commit_time', key: 'last_commit_time', width: 150 },
+  { title: '入库时间', dataIndex: 'insert_time', key: 'insert_time', width: 150 },
+  { title: '操作', key: 'action', width: 150 }
+];
+
+const fetchToolsData = async () => {
+  toolsLoading.value = true;
+  try {
+    const res = await request.get('/github_threat/tools_target');
+    if (res.code === 200) {
+      toolsData.value = res.data || [];
+    }
+  } catch (error) {
+    message.error('获取监控工具失败');
+  } finally {
+    toolsLoading.value = false;
+  }
+};
+
+const handleToolDelete = async (repo_url) => {
+  const res = await request.post('/github_threat/tools_target/delete', { repo_url });
+  if (res.code === 200) {
+    message.success('已取消监控');
+    fetchToolsData();
+  }
+};
+
+const openToolAdd = () => {
+  toolForm.repo_url = '';
+  toolModalVisible.value = true;
+};
+
+const submitToolModal = async () => {
+  if (!toolForm.repo_url) return message.warning('URL 不能为空');
+  const res = await request.post('/github_threat/tools_target', toolForm);
+  if (res.code === 200) {
+    message.success('添加成功');
+    toolModalVisible.value = false;
+    fetchToolsData();
+  } else {
+    message.error(res.message);
+  }
+};
+
+// ==========================================
+// 🧑‍💻 模块 D: 大佬动态监控 (github_hackers_target)
+// ==========================================
+const hackersLoading = ref(false);
+const hackersData = ref([]);
+
+const hackersSearchForm = reactive({ github_id: '' });
+const filteredHackersData = computed(() => {
+  return hackersData.value.filter(item => {
+    if (hackersSearchForm.github_id && !item.github_id.toLowerCase().includes(hackersSearchForm.github_id.toLowerCase())) return false;
+    return true;
+  });
+});
+const hackersSelectedRowKeys = ref([]);
+const hackersHasSelected = computed(() => hackersSelectedRowKeys.value.length > 0);
+const onHackersSelectChange = (keys) => { hackersSelectedRowKeys.value = keys; };
+
+const handleHackersBatchDelete = async () => {
+  const res = await request.post('/github_threat/hackers_target/delete', { github_ids: hackersSelectedRowKeys.value });
+  if (res.code === 200) {
+    message.success('批量删除成功');
+    hackersSelectedRowKeys.value = [];
+    fetchHackersData();
+  } else {
+    message.error(res.message);
+  }
+};
+
+const hackerModalVisible = ref(false);
+const hackerForm = reactive({ github_id: '' });
+
+const historyDrawerVisible = ref(false);
+const historyLoading = ref(false);
+const hackersHistoryData = ref([]);
+
+const hackersColumns = [
+  { title: 'Github ID (大牛/团队)', dataIndex: 'github_id', key: 'github_id', width: 250 },
+  { title: '已发现开源工具数', dataIndex: 'found_count', key: 'found_count', width: 180 },
+  { title: '监控添加时间', dataIndex: 'insert_time', key: 'insert_time', width: 180 },
+  { title: '操作', key: 'action', width: 150 }
+];
+
+const historyColumns = [
+  { title: '发现时间', dataIndex: 'insert_time', key: 'insert_time', width: 180 },
+  { title: '工具仓库路径', dataIndex: 'full_name', key: 'full_name' }
+];
+
+const openHackersHistoryDrawer = () => {
+  historyDrawerVisible.value = true;
+  fetchHackersHistory();
+};
+
+const closeHackersHistoryDrawer = () => {
+  historyDrawerVisible.value = false;
+};
+
+const fetchHackersHistory = async () => {
+  historyLoading.value = true;
+  try {
+    const res = await request.get('/github_threat/hackers_history');
+    if (res.code === 200) {
+      hackersHistoryData.value = res.data || [];
+    }
+  } catch (error) {
+    message.error('加载发现记录失败');
+  } finally {
+    historyLoading.value = false;
+  }
+};
+
+const fetchHackersData = async () => {
+  hackersLoading.value = true;
+  try {
+    const res = await request.get('/github_threat/hackers_target');
+    if (res.code === 200) {
+      hackersData.value = res.data || [];
+    }
+  } catch (error) {
+    message.error('获取监控大牛失败');
+  } finally {
+    hackersLoading.value = false;
+  }
+};
+
+const handleHackerDelete = async (github_id) => {
+  const res = await request.post('/github_threat/hackers_target/delete', { github_id });
+  if (res.code === 200) {
+    message.success('已取消监控');
+    fetchHackersData();
+  }
+};
+
+const openHackerAdd = () => {
+  hackerForm.github_id = '';
+  hackerModalVisible.value = true;
+};
+
+const submitHackerModal = async () => {
+  if (!hackerForm.github_id) return message.warning('ID 不能为空');
+  const res = await request.post('/github_threat/hackers_target', hackerForm);
+  if (res.code === 200) {
+    message.success('添加成功');
+    hackerModalVisible.value = false;
+    fetchHackersData();
+  } else {
+    message.error(res.message);
+  }
+};
+
+// ==========================================
+// 🛡️ 模块 E: CVE 监控历史 (github_cve_history)
+// ==========================================
+const cveLoading = ref(false);
+const cveData = ref([]);
+
+const cveSearchForm = reactive({ cve_name: '', desc: '' });
+const filteredCveData = computed(() => {
+  return cveData.value.filter(item => {
+    if (cveSearchForm.cve_name && !item.cve_name.toLowerCase().includes(cveSearchForm.cve_name.toLowerCase())) return false;
+    if (cveSearchForm.desc && !item.desc.toLowerCase().includes(cveSearchForm.desc.toLowerCase())) return false;
+    return true;
+  });
+});
+const cveSelectedRowKeys = ref([]);
+const cveHasSelected = computed(() => cveSelectedRowKeys.value.length > 0);
+const onCveSelectChange = (keys) => { cveSelectedRowKeys.value = keys; };
+
+const handleCveBatchDelete = async () => {
+  const res = await request.post('/github_threat/cve_history/delete', { cve_names: cveSelectedRowKeys.value });
+  if (res.code === 200) {
+    message.success('批量删除成功');
+    cveSelectedRowKeys.value = [];
+    fetchCveData();
+  } else {
+    message.error(res.message);
+  }
+};
+
+const handleCveDelete = async (cve_name) => {
+  const res = await request.post('/github_threat/cve_history/delete', { cve_name });
+  if (res.code === 200) {
+    message.success('删除成功');
+    fetchCveData();
+  } else {
+    message.error(res.message);
+  }
+};
+
+
+const cveColumns = [
+  { title: 'CVE 编号', dataIndex: 'cve_name', key: 'cve_name', width: 150 },
+  { title: 'Github 地址', dataIndex: 'cve_url', key: 'cve_url', width: 250 },
+  { title: '官方描述', dataIndex: 'desc', key: 'desc', width: 450 },
+  { title: '最近推送', dataIndex: 'pushed_at', key: 'pushed_at', width: 120 },
+  { title: '收录时间', dataIndex: 'insert_time', key: 'insert_time', width: 180 },
+  { title: '操作', key: 'action', width: 100 }
+];
+
+const fetchCveData = async () => {
+  cveLoading.value = true;
+  try {
+    const res = await request.get('/github_threat/cve_history');
+    if (res.code === 200) {
+      cveData.value = res.data || [];
+    }
+  } catch (error) {
+    message.error('获取 CVE 监控记录失败');
+  } finally {
+    cveLoading.value = false;
+  }
+};
+
+const cveConfig = reactive({ enabled: false, interval: 6 });
+const cveRunLoading = ref(false);
+
+const fetchCveConfig = async () => {
+  try {
+    const res = await request.get('/github_threat/cve_config');
+    if (res.code === 200) {
+      cveConfig.enabled = res.data.enabled;
+      cveConfig.interval = res.data.interval;
+    }
+  } catch (error) {
+    console.error(error);
+  }
+};
+
+const saveCveConfig = async () => {
+  try {
+    const res = await request.post('/github_threat/cve_config', cveConfig);
+    if (res.code === 200) {
+      message.success('配置已保存');
+    } else {
+      message.error(res.message || '配置保存失败');
+    }
+  } catch (error) {
+    message.error('配置保存失败');
+  }
+};
+
+const runCveOnce = async () => {
+  cveRunLoading.value = true;
+  const hide = message.loading('任务已提交，后台正在扫描中...', 0);
+  try {
+    const start = Date.now();
+    const res = await request.post('/github_threat/cve_run_once');
+    const elapsed = Date.now() - start;
+    if (elapsed < 2000) await new Promise(r => setTimeout(r, 2000 - elapsed));
+    
+    if (res.code === 200) {
+      hide();
+      Modal.success({ title: '扫描结束', content: res.data?.msg || '扫描逻辑已全部执行完毕！数据已同步刷新。' });
+      fetchCveData(); // 自动刷新列表
+    } else {
+      hide();
+      message.error(res.message || '运行失败');
+    }
+  } catch (error) {
+    hide();
+    message.error('请求失败');
+  } finally {
+    cveRunLoading.value = false;
+  }
+};
+
+const tokenStatus = reactive({ status: '', msg: '' });
+const fetchTokenStatus = async () => {
+  try {
+    const res = await request.get('/github_threat/token_status');
+    if (res.code === 200) {
+      tokenStatus.status = res.data.status;
+      tokenStatus.msg = res.data.msg;
+    }
+  } catch (error) {
+    console.error(error);
+  }
+};
+
+const toolsConfig = reactive({ enabled: false, interval: 6 });
+const hackersConfig = reactive({ enabled: false, interval: 6 });
+
+const fetchToolsConfig = async () => {
+  try {
+    const res = await request.get('/github_threat/tools_config');
+    if (res.code === 200) {
+      toolsConfig.enabled = res.data.enabled;
+      toolsConfig.interval = res.data.interval;
+    }
+  } catch (error) {
+    console.error(error);
+  }
+};
+
+const saveToolsConfig = async () => {
+  try {
+    const res = await request.post('/github_threat/tools_config', toolsConfig);
+    if (res.code === 200) {
+      message.success('配置已保存');
+    } else {
+      message.error(res.message || '配置保存失败');
+    }
+  } catch (error) {
+    message.error('配置保存失败');
+  }
+};
+
+const runToolsOnce = async () => {
+  const hide = message.loading('任务已提交，后台正在扫描中...', 0);
+  try {
+    const start = Date.now();
+    const res = await request.post('/github_threat/tools_run_once');
+    const elapsed = Date.now() - start;
+    if (elapsed < 2000) await new Promise(r => setTimeout(r, 2000 - elapsed));
+
+    if (res.code === 200) {
+      hide();
+      Modal.success({ title: '扫描结束', content: res.data?.msg || '扫描逻辑已全部执行完毕！数据已同步刷新。' });
+      fetchToolsData(); // 自动刷新列表
+    } else {
+      hide();
+      message.error(res.message || '运行失败');
+    }
+  } catch (error) {
+    hide();
+    message.error('请求失败');
+  }
+};
+
+const fetchHackersConfig = async () => {
+  try {
+    const res = await request.get('/github_threat/hackers_config');
+    if (res.code === 200) {
+      hackersConfig.enabled = res.data.enabled;
+      hackersConfig.interval = res.data.interval;
+    }
+  } catch (error) {
+    console.error(error);
+  }
+};
+
+const saveHackersConfig = async () => {
+  try {
+    const res = await request.post('/github_threat/hackers_config', hackersConfig);
+    if (res.code === 200) {
+      message.success('配置已保存');
+    } else {
+      message.error(res.message || '配置保存失败');
+    }
+  } catch (error) {
+    message.error('配置保存失败');
+  }
+};
+
+const runHackersOnce = async () => {
+  const hide = message.loading('任务已提交，后台正在扫描中...', 0);
+  try {
+    const start = Date.now();
+    const res = await request.post('/github_threat/hackers_run_once');
+    const elapsed = Date.now() - start;
+    if (elapsed < 2000) await new Promise(r => setTimeout(r, 2000 - elapsed));
+
+    if (res.code === 200) {
+      hide();
+      Modal.success({ title: '扫描结束', content: res.data?.msg || '扫描逻辑已全部执行完毕！数据已同步刷新。' });
+      fetchHackersData(); // 自动刷新列表
+    } else {
+      hide();
+      message.error(res.message || '运行失败');
+    }
+  } catch (error) {
+    hide();
+    message.error('请求失败');
   }
 };
 </script>

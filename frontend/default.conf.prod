@@ -1,5 +1,5 @@
 server {
-    listen       5173 ssl;
+    listen       5173 ssl http2;
     server_name  localhost;
 
     ssl_certificate      /certs/arl.crt;
@@ -17,6 +17,8 @@ server {
     gzip_comp_level 6;
     gzip_types text/plain text/css application/json application/javascript text/xml application/xml application/xml+rss text/javascript image/svg+xml;
     gzip_vary on;
+    # 必须开启 gzip_proxied 才能压缩代理转发的 API 响应内容
+    gzip_proxied any;
 
     # 1. 静态文件代理
     location / {

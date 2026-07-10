@@ -67,8 +67,11 @@ def http_req(url, method='get', **kwargs):
     conn = getattr(requests, method)(url, **kwargs)
 
     timeout = kwargs.get("timeout")
-    if len(timeout) > 1 and timeout[1]:
-        timeout = timeout[1]
+    try:
+        if isinstance(timeout, (list, tuple)) and len(timeout) > 1 and timeout[1]:
+            timeout = timeout[1]
+    except Exception:
+        pass
 
     patch_content(conn, timeout)
 

@@ -14,8 +14,8 @@ class CheckHTTP(BaseThread):
         self.checkout_map = {}
 
     def check(self, url):
-        conn = utils.http_req(url, method="get", timeout=self.timeout, stream=True)
-        conn.close()
+        # 移除了流处理和手动 close，顺应底层的连接池机制
+        conn = utils.http_req(url, method="get", timeout=self.timeout)
 
         if conn.status_code == 400:
             # 特殊情况排除
@@ -32,9 +32,8 @@ class CheckHTTP(BaseThread):
             return None
 
         if conn.status_code == 403:
-            conn2 = utils.http_req(url)
-            check = b'</title><style type="text/css">body{margin:5% auto 0 auto;padding:0 18px}'
-            if check in conn2.content:
+            check_str = b'</title><style type="text/css">body{margin:5% auto 0 auto;padding:0 18px}'
+            if check_str in conn.content:
                 return None
 
         item = {

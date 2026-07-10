@@ -78,7 +78,7 @@
 
     <div v-show="activeTab === 'log'">
       <div style="border: 1px solid #e8e8e8; border-radius: 4px; padding: 8px; background-color: #fafafa;">
-        <div style="background-color: #001529; color: #e6f7ff; font-family: 'Fira Code', Consolas, 'Courier New', monospace; padding: 16px; border-radius: 4px; height: 60vh; overflow-y: auto; font-size: 13px; line-height: 1.6; box-shadow: inset 0 2px 8px rgba(0,0,0,0.2);">
+        <div ref="terminalContainer" style="background-color: #001529; color: #e6f7ff; font-family: 'Fira Code', Consolas, 'Courier New', monospace; padding: 16px; border-radius: 4px; height: calc(100vh - 220px); overflow-y: auto; font-size: 13px; line-height: 1.6; box-shadow: inset 0 2px 8px rgba(0,0,0,0.2);">
           <div v-for="(log, idx) in syslogList" :key="idx" style="margin-bottom: 6px; word-break: break-all; border-bottom: 1px dashed rgba(255,255,255,0.1); padding-bottom: 4px;">
             <span style="color: #00bcd4; margin-right: 8px;">[{{ log.create_time }}]</span>
             <span :style="{ color: log.level === 'error' ? '#ff4d4f' : log.level === 'warning' ? '#faad14' : '#52c41a', fontWeight: 'bold', marginRight: '8px' }">[{{ (log.level || 'info').toUpperCase() }}]</span>
@@ -93,7 +93,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, onUnmounted } from 'vue';
+import { ref, reactive, onMounted, onUnmounted, nextTick } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { SearchOutlined } from '@ant-design/icons-vue';
 import request from '../utils/request';
@@ -123,6 +123,7 @@ const pagination = reactive({ current: 1, pageSize: 10, total: 0 });
 
 const syslogList = ref([]);
 let syslogTimer = null;
+const terminalContainer = ref(null);
 
 import { computed } from 'vue';
 
@@ -267,6 +268,11 @@ const fetchSyslog = async () => {
     const res = await request.get('/syslog/', { params: { task_id: taskId, size: 500, order: 'create_time' } });
     if (res.code === 200) {
       syslogList.value = res.items || [];
+      nextTick(() => {
+        if (terminalContainer.value) {
+          terminalContainer.value.scrollTop = terminalContainer.value.scrollHeight;
+        }
+      });
     }
   } catch (error) {
     console.error('获取日志失败:', error);

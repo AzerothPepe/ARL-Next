@@ -237,33 +237,12 @@ class GithubTaskMonitor(GithubTaskTask):
 
         logger.info("found new result {} {}".format(self.keyword, len(self.new_results)))
 
-        self.push_dingding()
-        self.push_email()
-
-    def push_dingding(self):
-        try:
-            if Config.DINGDING_ACCESS_TOKEN and Config.DINGDING_SECRET:
-                data = push.dingding_send(access_token=Config.DINGDING_ACCESS_TOKEN,
-                                      secret=Config.DINGDING_SECRET, msgtype="markdown",
-                                      msg=self.build_markdown_report())
-                if data.get("errcode", -1) == 0:
-                    logger.info("push dingding succ")
-                return True
-
-        except Exception as e:
-            logger.warning(self.keyword, e)
-
-    def push_email(self):
-        try:
-            if Config.EMAIL_HOST and Config.EMAIL_USERNAME and Config.EMAIL_PASSWORD:
-                html_report = self.build_html_report()
-                push.send_email(host=Config.EMAIL_HOST, port=Config.EMAIL_PORT, mail=Config.EMAIL_USERNAME,
-                                password=Config.EMAIL_PASSWORD, to=Config.EMAIL_TO,
-                                title="[Github--{}] 灯塔消息推送".format(self.keyword), html=html_report)
-                logger.info("send email succ")
-                return True
-        except Exception as e:
-            logger.warning(self.keyword, e)
+        from app.utils.push import unified_push
+        unified_push(
+            push_type="github_leak",
+            title=f"GitHub 关键字特征监控告警 [{self.keyword}]",
+            content=self.build_markdown_report()
+        )
 
     def run(self):
         self.set_start_time()

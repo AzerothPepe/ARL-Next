@@ -117,6 +117,6 @@ def asset_wih_monitor(scope_id: str):
 
 def domain_in_scope_domain(domain: str, scope_domain: list):
     for scope in scope_domain:
-        if domain.endswith("." + scope):
+        if domain == scope or domain.endswith("." + scope):
             return True
     return False

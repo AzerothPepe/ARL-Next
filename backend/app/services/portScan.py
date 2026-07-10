@@ -50,11 +50,11 @@ class PortScan:
             self.max_retries = 2
         else:
             # 端口少的话，直接 -Pn (默认所有主机存活，不探活直接扫)，最准。
-            if self.ports != "0-65535":
+            if self.ports != "1-65535":
                 self.nmap_arguments += " -Pn"
 
-        # 全端口(0-65535)扫描是极度危险且耗时的操作，必须采用极端的调优参数
-        if self.ports == "0-65535":
+        # 全端口(1-65535)扫描是极度危险且耗时的操作，必须采用极端的调优参数
+        if self.ports == "1-65535":
             self.max_host_group = 2             # 减小并发组，防止把路由器连接数打满
             self.min_rate = max(self.min_rate, 800) # 强制提高发包下限速率
             self.parallelism = max(self.parallelism, 128)

@@ -1,5 +1,12 @@
 <template>
   <div style="background-color: #fff; padding: 24px; min-height: calc(100vh - 64px);">
+    <div style="margin-bottom: 16px;">
+      <a-button @click="goBack" style="margin-right: 16px;">
+        <template #icon><left-outlined /></template>
+        返回上一页
+      </a-button>
+      <span style="font-size: 16px; font-weight: bold;">单次扫描任务详情</span>
+    </div>
     <a-tabs v-model:activeKey="activeTab" type="card">
       
       <!-- ================= Tab 1: 扫描结果 ================= -->
@@ -73,39 +80,17 @@
 
       <!-- ================= Tab 2: 执行日志 ================= -->
       <a-tab-pane key="log" tab="任务日志">
-        <div style="margin-bottom: 16px; display: flex; justify-content: flex-end;">
-          <a-button type="dashed" @click="fetchLogData">
-            <template #icon><sync-outlined /></template>
-            刷新日志
-          </a-button>
-        </div>
-        
-        <a-table
-            :loading="logLoading"
-            :dataSource="logDataSource"
-            :columns="logColumns"
-            :pagination="false"
-            size="middle"
-            :rowKey="(record) => record._id"
-        >
-          <template #emptyText>
-            <div style="padding: 40px 0;">
-              <inbox-outlined style="font-size: 48px; color: #d9d9d9;" />
-              <div style="color: #999; margin-top: 8px;">暂无日志数据</div>
+        <div style="border: 1px solid #e8e8e8; border-radius: 4px; padding: 8px; background-color: #fafafa;">
+          <div ref="terminalContainer" style="background-color: #001529; color: #e6f7ff; font-family: 'Fira Code', Consolas, 'Courier New', monospace; padding: 16px; border-radius: 4px; height: calc(100vh - 220px); overflow-y: auto; font-size: 13px; line-height: 1.6; box-shadow: inset 0 2px 8px rgba(0,0,0,0.2);">
+            <div v-for="(log, idx) in logDataSource" :key="log._id || idx" style="margin-bottom: 6px; word-break: break-all; border-bottom: 1px dashed rgba(255,255,255,0.1); padding-bottom: 4px;">
+              <span style="color: #00bcd4; margin-right: 8px;">[{{ log.create_time }}]</span>
+              <span :style="{ color: log.level === 'error' ? '#ff4d4f' : log.level === 'warning' ? '#faad14' : '#52c41a', fontWeight: 'bold', marginRight: '8px' }">[{{ (log.level || 'info').toUpperCase() }}]</span>
+              <span style="color: #1890ff; margin-right: 8px;" v-if="log.title">[{{ log.title }}]</span>
+              <span style="color: #e6f7ff;">{{ log.message }}</span>
             </div>
-          </template>
-          <template #bodyCell="{ column, record }">
-            <template v-if="column.key === 'level'">
-              <a-tag :color="record.level === 'error' ? 'error' : record.level === 'warning' ? 'warning' : 'blue'">
-                {{ record.level }}
-              </a-tag>
-            </template>
-          </template>
-        </a-table>
-
-        <div style="display: flex; justify-content: space-between; align-items: center; padding: 16px 0;">
-          <div style="color: rgba(0,0,0,.65);">共 {{ Math.ceil(logPagination.total / logPagination.pageSize) || 1 }} 页 / {{ logPagination.total }} 条数据</div>
-          <a-pagination v-model:current="logPagination.current" v-model:pageSize="logPagination.pageSize" :total="logPagination.total" show-size-changer @change="handleLogTableChange" />
+            <div v-if="logDataSource.length === 0 && !logLoading" style="color: rgba(255,255,255,0.45); font-style: italic;">[System] 暂无日志记录...</div>
+            <div v-if="logLoading" style="color: rgba(255,255,255,0.45); font-style: italic;">[System] 正在拉取日志...</div>
+          </div>
         </div>
       </a-tab-pane>
 
@@ -114,14 +99,20 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, watch } from 'vue';
-import { useRoute } from 'vue-router';
+import { ref, reactive, onMounted, watch, nextTick, onUnmounted } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import request from '../utils/request';
 import { message } from 'ant-design-vue';
-import { SearchOutlined, InboxOutlined, SyncOutlined } from '@ant-design/icons-vue';
+import { SearchOutlined, InboxOutlined, SyncOutlined, LeftOutlined } from '@ant-design/icons-vue';
 
 const route = useRoute();
+const router = useRouter();
 const activeTab = ref('result');
+
+const goBack = () => {
+  // 返回带上之前的 tab 参数，保证退回的是任务列表而不是策略列表
+  router.push({ path: '/GitHubTasks/GitHubTasksList', query: { tab: 'task' } });
+};
 
 const loading = ref(false);
 const dataSource = ref([]);
@@ -183,50 +174,55 @@ const handleTableChange = (page, pageSize) => { pagination.current = page; pagin
 // ================= 日志拉取 =================
 const logLoading = ref(false);
 const logDataSource = ref([]);
-const logPagination = reactive({ current: 1, pageSize: 10, total: 0 });
+const terminalContainer = ref(null);
+let syslogTimer = null;
 
-const logColumns = [
-  { title: '时间', dataIndex: 'create_time', key: 'create_time', width: 200 },
-  { title: '级别', dataIndex: 'level', key: 'level', width: 100 },
-  { title: '标题', dataIndex: 'title', key: 'title', width: 150 },
-  { title: '内容', dataIndex: 'message', key: 'message' }
-];
-
-const fetchLogData = async () => {
+const fetchLogData = async (isPolling = false) => {
   if (!taskId) return;
+  if (!isPolling) logLoading.value = true;
   
-  logLoading.value = true;
   try {
     const params = {
-      page: logPagination.current,
-      size: logPagination.pageSize,
-      task_id: taskId
+      size: 500,
+      task_id: taskId,
+      order: 'create_time'
     };
     const res = await request.get('/syslog/', { params });
     if (res.code === 200) {
       logDataSource.value = res.items || [];
-      logPagination.total = res.total || 0;
+      nextTick(() => {
+        if (terminalContainer.value) {
+          terminalContainer.value.scrollTop = terminalContainer.value.scrollHeight;
+        }
+      });
     }
   } catch (error) {
-    message.error('加载任务日志失败');
+    if (!isPolling) message.error('加载任务日志失败');
   } finally {
-    logLoading.value = false;
+    if (!isPolling) logLoading.value = false;
   }
 };
-
-const handleLogTableChange = (page, pageSize) => { logPagination.current = page; logPagination.pageSize = pageSize; fetchLogData(); };
 
 watch(activeTab, (newTab) => {
   if (newTab === 'result') {
     fetchData();
+    if (syslogTimer) clearInterval(syslogTimer);
   } else if (newTab === 'log') {
     fetchLogData();
+    syslogTimer = setInterval(() => fetchLogData(true), 5000);
   }
 });
 
 onMounted(() => {
   fetchData();
-  fetchLogData();
+  if (activeTab.value === 'log') {
+    fetchLogData();
+    syslogTimer = setInterval(() => fetchLogData(true), 5000);
+  }
+});
+
+onUnmounted(() => {
+  if (syslogTimer) clearInterval(syslogTimer);
 });
 </script>
 

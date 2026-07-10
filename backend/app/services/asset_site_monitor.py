@@ -46,12 +46,15 @@ class AssetSiteCompare(BaseThread):
             if new_site_info["status"] in [404, 502, 504]:
                 continue
 
-            if new_site_info["title"] != site_info["title"]:
+            old_title = site_info.get("title", "")
+            old_status = site_info.get("status", 0)
+
+            if new_site_info["title"] != old_title:
                 # 只关注标题不为空
                 if new_site_info["title"]:
                     self.site_change_map[curr_site] = site_info
 
-            elif new_site_info["status"] != site_info["status"]:
+            if new_site_info["status"] != old_status:
                 # 只关注变成200的变化
                 if new_site_info["status"] == 200:
                     self.site_change_map[curr_site] = site_info
@@ -79,11 +82,9 @@ class AssetSiteMonitor(object):
         self.scope_name = scope_data["name"]
 
     def compare_status(self, site_info, old_site_info):
-        curr_status = site_info["status"]
-        old_status = old_site_info["status"]
+        curr_status = site_info.get("status", 0)
+        old_status = old_site_info.get("status", 0)
         curr_site = site_info["site"]
-
-        asset_site_id = old_site_info["_id"]
 
         if curr_status != old_status:
             item = {
@@ -93,16 +94,14 @@ class AssetSiteMonitor(object):
             }
             logger.info("{} status {} => {}".format(curr_site, old_status, curr_status))
 
-            self.update_asset_site(asset_site_id, site_info)
             self.status_change_list.append(item)
             return True
+        return False
 
     def compare_title(self, site_info, old_site_info):
-        curr_title = site_info["title"]
-        old_title = old_site_info["title"]
+        curr_title = site_info.get("title", "")
+        old_title = old_site_info.get("title", "")
         curr_site = site_info["site"]
-
-        asset_site_id = old_site_info["_id"]
 
         if curr_title != old_title:
             item = {
@@ -113,10 +112,9 @@ class AssetSiteMonitor(object):
 
             logger.info("{} title {} => {}".format(curr_site, old_title, curr_title))
 
-            self.update_asset_site(asset_site_id, site_info)
-
             self.title_change_list.append(item)
             return True
+        return False
 
     def build_change_list(self):
         compare = AssetSiteCompare(scope_id=self.scope_id)
@@ -137,18 +135,21 @@ class AssetSiteMonitor(object):
             if curr_site not in site_change_map:
                 continue
 
-            if "入口" not in site_info["tag"]:
+            if "入口" not in site_info.get("tag", []):
                 continue
 
             old_site_info = site_change_map[curr_site]
 
+            changed = False
             if self.compare_title(site_info, old_site_info):
-                self.site_change_info_list.append(site_info)
-                continue
+                changed = True
 
             if self.compare_status(site_info, old_site_info):
+                changed = True
+
+            if changed:
                 self.site_change_info_list.append(site_info)
-                continue
+                self.update_asset_site(old_site_info["_id"], site_info)
 
     # 对新发现的资产分组站点进行删除操作并添加一条新的数据
     def update_asset_site(self, asset_id, site_info):
@@ -297,12 +298,10 @@ class AssetSiteMonitor(object):
             logger.info("not found change by {}".format(self.scope_id))
             return
 
-        html_report = self.build_html_report()
         html_title = "[站点监控-{}] 灯塔消息推送".format(self.scope_name)
-        push_email(title=html_title, html_report=html_report)
-
         markdown_report = self.build_markdown_report()
-        push_dingding(markdown_report=markdown_report)
+        from app.utils.push import unified_push
+        unified_push("asset_site", html_title, markdown_report)
 
 
 class Domain2SiteMonitor(object):

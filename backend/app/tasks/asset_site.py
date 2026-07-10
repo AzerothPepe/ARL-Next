@@ -61,10 +61,8 @@ class AssetSiteUpdateTask(CommonTask):
             html_report += "\n<br/>"
             html_report += domain2site_monitor.html_report
 
-        if html_report:
-            html_title = "[站点监控-{}] 灯塔消息推送".format(monitor.scope_name)
-            push_email(title=html_title, html_report=html_report)
-
+        html_title = "[站点监控-{}] 灯塔消息推送".format(monitor.scope_name)
+        
         markdown_report = ""
         if monitor.site_change_info_list:
             markdown_report = monitor.build_markdown_report()
@@ -74,7 +72,8 @@ class AssetSiteUpdateTask(CommonTask):
             markdown_report += domain2site_monitor.dingding_markdown
 
         if markdown_report:
-            push_dingding(markdown_report=markdown_report)
+            from app.utils.push import unified_push
+            unified_push("asset_site", html_title, markdown_report)
 
         if html_report or markdown_report:
             webhook.site_asset_web_hook(task_id=self.task_id, scope_id=self.scope_id)

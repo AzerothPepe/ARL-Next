@@ -70,6 +70,9 @@ api.add_namespace(routes.cdn_dict_ns)
 api.add_namespace(routes.system_config_ns)
 api.add_namespace(routes.icp_ns)
 
+from app.routes.github_threat import github_threat_bp
+arl_app.register_blueprint(github_threat_bp, url_prefix='/api/github_threat')
+
 arl_update()
 
 if __name__ == '__main__':

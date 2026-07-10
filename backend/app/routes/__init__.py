@@ -244,7 +244,10 @@ class ARLResource(Resource):
             result = conn(collection).find(query).sort(orderby_list).skip(size * (page - 1)).limit(size)
 
         # 4. 计算一共有多少条符合条件的数据（前端要做分页条，必须知道总数）
-        count = conn(collection).count(query)
+        if not query:
+            count = conn(collection).estimated_document_count()
+        else:
+            count = conn(collection).count_documents(query)
 
         # 5. 让“打包流水线”把查出来的数据里的特殊字符（活鱼）包装成普通文本
         items = self.build_return_items(result)

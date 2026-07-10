@@ -74,13 +74,31 @@ class GithubResult(object):
     def human_content(self, keyword):
         lines = self.content.split("\n")
         max_len = 8
+        
+        # 提取真实的查询关键词 (去除 GitHub 语法如 in:file, extension:py, 且去除引号，转小写)
+        import re
+        clean_keyword = re.sub(r'[a-zA-Z]+:[^\s]+', '', keyword)
+        clean_keyword = clean_keyword.replace('"', '').replace("'", "")
+        terms = [t.strip().lower() for t in clean_keyword.split() if t.strip()]
+        if not terms:
+            terms = [keyword.replace('"', '').replace("'", "").lower()]
+
+        from collections import deque
         before_lines = deque(maxlen=max_len)
         index = 0
+        match_found = False
+        
         for line in lines:
-            if keyword in line:
+            line_lower = line.lower()
+            if any(term in line_lower for term in terms):
+                match_found = True
                 break
             before_lines.append(line)
             index += 1
+
+        if not match_found:
+            # 如果没找到，说明是跨行、特殊编码或正则没命中，直接返回文件的前 16 行
+            return "\n".join(lines[:max_len * 2])
 
         after_lines = lines[index:index + max_len]
         return "{}\n{}".format("\n".join(before_lines), "\n".join(after_lines))

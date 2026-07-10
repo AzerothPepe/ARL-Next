@@ -321,6 +321,10 @@ def run_forever():
     cleanup_zombie_tasks()
     
     while True:
+        # Threat Intelligence (CVE/Tools/Hackers) 独立任务调度
+        from app.tasks.github_threat_monitor import threat_intelligence_scheduler
+        threat_intelligence_scheduler()
+
         # 资产监控任务调度
         asset_monitor_scheduler()
 

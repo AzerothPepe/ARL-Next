@@ -7,74 +7,71 @@ from app import utils
 logger = utils.get_logger()
 
 
-class BaiduSearch(object):
+class SoSearch(object):
     def __init__(self, keyword=None, page_num=6):
-        self.search_url = "https://www.baidu.com/s?rn=100&pn={page}&wd={keyword}"
-        self.num_pattern = re.compile(r'百度为您找到相关结果约?([\d,]*)个')
-        self.first_html = ""
+        self.search_url = "https://www.so.com/s?q={keyword}&pn={page}"
         self.keyword = keyword
         self.page_num = page_num
-        self.pq_query = "#content_left h3.t a"
-        self.headers = {"Accept-Language": "zh-cn"}
-        self.search_result_num = 0
-        self.default_interval = 3
-
-    def result_num(self):
-        url = self.search_url.format(page=0, keyword=quote(self.keyword))
-        html = utils.http_req(url, headers=self.headers).text
-        self.first_html = html
-        result = re.findall(self.num_pattern, html)
-        if not result:
-            logger.warning("Unable to get baidu search results， {}".format(self.keyword))
-            return 0
-
-        num = int("".join(result[0].split(",")))
-        self.search_result_num = num
-        return num
+        self.headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+        }
+        from app.config import Config
+        cookie = Config.SO_SEARCH_COOKIE
+        if cookie:
+            self.headers["Cookie"] = cookie
+        self.default_interval = 3.0
 
     def match_urls(self, html):
-        result = re.findall(self.num_pattern, html)
-        if not result:
-            raise Exception("获取百度结果异常")
-
         dom = pq(html)
-        result_items = dom(self.pq_query).items()
-        urls_result = [item.attr("href") for item in result_items]
+        links = dom("h3.res-title a").items()
+        
         urls = set()
-        for u in urls_result:
+        for link in links:
+            href = link.attr("data-url") or link.attr("href")
+            if not href or not href.startswith("http"):
+                continue
+            
             try:
-                if not re.match(r'^https?:/{2}\w.+$', u):
-                    logger.info("url {} is invalid".format(u))
+                if not re.match(r'^https?:/{2}\w.+$', href):
+                    logger.info("url {} is invalid".format(href))
                     continue
-                resp = utils.http_req(u, "head")
-                real_url = resp.headers.get('Location')
-                if real_url:
+                
+                resp = utils.http_req(href, "get", headers=self.headers, timeout=(5.1, 5.1))
+                match = re.search(r'URL=[\'"]?([^\'">]+)[\'"]?', resp.text, re.I)
+                if not match:
+                    match = re.search(r'window\.location\.replace\([\'"]([^\'"]+)[\'"]\)', resp.text)
+                
+                if match:
+                    real_url = match.group(1)
                     urls.add(real_url)
             except Exception as e:
-                logger.exception(e)
+                logger.debug("SoSearch URL GET request failed {}: {}".format(href, e))
         return list(urls)
 
     def run(self):
-        self.result_num()
-        logger.info("baidu search {} results found for keyword {}".format(self.search_result_num, self.keyword))
         urls = []
-
-        # 没有找到直接return
-        if self.search_result_num == 0:
-            return urls
-
-        for page in range(1, min(int(self.search_result_num / 10) + 2, self.page_num + 1)):
-            if page == 1:
-                _urls = self.match_urls(self.first_html)
+        # SO pagination is pn=1, 2, 3...
+        for page in range(1, self.page_num + 1):
+            try:
+                if page > 1:
+                    time.sleep(self.default_interval)
+                url = self.search_url.format(page=page, keyword=quote(self.keyword))
+                resp = utils.http_req(url, headers=self.headers)
+                
+                if resp.status_code != 200:
+                    logger.warning("360 search page {} failed with status {}".format(page, resp.status_code))
+                    break
+                    
+                _urls = self.match_urls(resp.text)
+                logger.info("360 search url {}, result {}".format(url, len(_urls)))
+                if not _urls: 
+                    # 遇到无结果说明被限制或者到达末尾
+                    break
                 urls.extend(_urls)
-                logger.info("baidu firsturl result {}".format(len(_urls)))
-            else:
-                time.sleep(self.default_interval)
-                url = self.search_url.format(page=(page - 1) * 10, keyword=quote(self.keyword))
-                html = utils.http_req(url, headers=self.headers).text
-                _urls = self.match_urls(html)
-                logger.info("baidu search url {}, result {}".format(url, len(_urls)))
-                urls.extend(_urls)
+            except Exception as e:
+                logger.warning("360 search page {} failed: {}".format(page, e))
+                break 
+                
         return urls
 
 
@@ -86,6 +83,10 @@ class BingSearch(object):
         self.keyword = keyword
         self.page_num = page_num
         self.headers = {"Accept-Language": "zh-cn"}
+        from app.config import Config
+        cookie = Config.BING_SEARCH_COOKIE
+        if cookie:
+            self.headers["Cookie"] = cookie
         self.default_interval = 3
         self.search_result_num = 0
         self.first_html = ""
@@ -151,9 +152,9 @@ class BingSearch(object):
         return urls
 
 
-def baidu_search(domain, page_num=6):
+def so_search(domain, page_num=6):
     keyword = "site:{}".format(domain)
-    b = BaiduSearch(keyword, page_num)
+    b = SoSearch(keyword, page_num)
     urls = b.run()
     urls = [u for u in urls if domain in urlparse(u).netloc]
     return utils.rm_similar_url(urls)
@@ -182,7 +183,7 @@ def bing_search(domain, page_num=5):
 class SearchEngines(object):
     # *** 调用搜索引擎查找URL
     def __init__(self, base_domain):
-        self.engines = [bing_search, baidu_search]
+        self.engines = [bing_search, so_search]
         self.base_domain = base_domain
 
     def run(self):
@@ -203,5 +204,5 @@ def search_engines(base_domain):
 
 
 if __name__ == '__main__':
-    for x in baidu_search("qq.com", 6):
+    for x in so_search("qq.com", 6):
         print(x)

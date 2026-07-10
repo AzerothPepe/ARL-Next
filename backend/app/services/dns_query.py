@@ -110,7 +110,7 @@ def run_plugin(p, target) -> (str, list):
             logger.debug(error_str)
         else:
             logger.error(f"{p.source_name} error {type(e)} {error_str}")
-        return []
+        return source_name, []
 
 
 # *****  执行域名查询插件

@@ -110,7 +110,7 @@ const routes = [
                 path: '/GitHubTasks/GitHubTasksList',
                 name: 'GithubManage',
                 component: () => import('../views/GithubManage.vue'),
-                meta: { title: 'GitHub管理' }
+                meta: { title: 'GitHub监控' }
             },
             {
                 path: '/GitHubTasks/GitHubTasksInfo', // 这个路径必须和列表页跳转时写的一模一样

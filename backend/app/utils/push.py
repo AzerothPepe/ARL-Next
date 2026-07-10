@@ -147,6 +147,24 @@ class Push(object):
             return False
         return True
 
+    def _push_telegram(self):
+        tpl = ""
+        if self.domain_len > 0:
+            tpl = "[{}]新发现域名 {}, 站点 {}\n".format(self.task_name, self.domain_len, self.site_len)
+            tpl = "{}{}".format(tpl, dict2dingding_mark(self.domain_info_list))
+
+        if self.ip_len > 0:
+            tpl = "[{}]新发现 IP {}, 站点{}\n".format(self.task_name, self.ip_len, self.site_len)
+            tpl = "{}{}".format(tpl, dict2dingding_mark(self.ip_info_list))
+
+        tpl = "{}\n{}".format(tpl, dict2dingding_mark(self.site_info_list))
+        try:
+            telegram_send(f"*{self.task_name}*\n\n{tpl}", bot_token=Config.TG_BOT_TOKEN, chat_id=Config.TG_CHAT_ID)
+            return True
+        except Exception as e:
+            logger.warning("Telegram发送失败 \n{}\n {}".format(tpl[:50], str(e)))
+            return False
+
     def _push_email(self):
         html = ""
         if self.domain_len > 0:
@@ -178,7 +196,7 @@ class Push(object):
                     return True
 
         except Exception as e:
-            logger.warning(self.task_name, e)
+            logger.warning(f"[{self.task_name}] push dingding error: {e}")
 
     def push_email(self):
         try:
@@ -187,7 +205,7 @@ class Push(object):
                 logger.info("send email succ")
                 return True
         except Exception as e:
-            logger.warning(self.task_name, e)
+            logger.warning(f"[{self.task_name}] push email error: {e}")
 
     def push_feishu(self):
         try:
@@ -196,7 +214,7 @@ class Push(object):
                 logger.info("send feishu succ")
                 return True
         except Exception as e:
-            logger.warning(self.task_name, e)
+            logger.warning(f"[{self.task_name}] push feishu error: {e}")
 
     def push_wx_work(self):
         try:
@@ -205,16 +223,75 @@ class Push(object):
                 logger.info("send wx work succ")
                 return True
         except Exception as e:
-            logger.warning(self.task_name, e)
+            logger.warning(f"[{self.task_name}] push wx work error: {e}")
+
+    def push_telegram(self):
+        try:
+            if getattr(Config, 'TG_BOT_TOKEN', None) and getattr(Config, 'TG_CHAT_ID', None):
+                self._push_telegram()
+                logger.info("send telegram succ")
+                return True
+        except Exception as e:
+            logger.warning(f"[{self.task_name}] push telegram error: {e}")
 
 
 def message_push(asset_map, asset_counter):
+    if "task_complete" not in Config.PUSH_OPTIONS:
+        return
     logger.info("ARL push run")
     p = Push(asset_map=asset_map, asset_counter=asset_counter)
     p.push_dingding()
     p.push_email()
     p.push_feishu()
     p.push_wx_work()
+    p.push_telegram()
+
+def unified_push(push_type: str, title: str, content: str):
+    """
+    统一消息推送入口，适配所有配置的有效渠道
+    """
+    if push_type not in Config.PUSH_OPTIONS:
+        return
+        
+    # 钉钉
+    if Config.DINGDING_ACCESS_TOKEN and Config.DINGDING_SECRET:
+        try:
+            dingding_send(content, Config.DINGDING_ACCESS_TOKEN, Config.DINGDING_SECRET, msgtype="markdown", title=title)
+        except Exception as e:
+            logger.warning(f"unified_push dingding error: {e}")
+            
+    # 飞书
+    if Config.FEISHU_WEBHOOK and Config.FEISHU_SECRET:
+        try:
+            feishu_send(content, Config.FEISHU_WEBHOOK, Config.FEISHU_SECRET, title=title)
+        except Exception as e:
+            logger.warning(f"unified_push feishu error: {e}")
+            
+    # 企业微信
+    if Config.WX_WORK_WEBHOOK:
+        try:
+            wx_content = f"**{title}**\n\n{content}"
+            wx_work_send(wx_content, Config.WX_WORK_WEBHOOK)
+        except Exception as e:
+            logger.warning(f"unified_push wx_work error: {e}")
+            
+    # 邮件
+    if Config.EMAIL_HOST and Config.EMAIL_USERNAME and Config.EMAIL_PASSWORD and Config.EMAIL_TO:
+        try:
+            html = content.replace('\n', '<br>')
+            html = f"<div><h3>{title}</h3><div>{html}</div></div>"
+            send_email(Config.EMAIL_HOST, Config.EMAIL_PORT, Config.EMAIL_USERNAME, Config.EMAIL_PASSWORD, Config.EMAIL_TO, title, html)
+        except Exception as e:
+            logger.warning(f"unified_push email error: {e}")
+
+    # Telegram
+    tg_token = getattr(Config, 'TG_BOT_TOKEN', None)
+    tg_chat = getattr(Config, 'TG_CHAT_ID', None)
+    if tg_token and tg_chat:
+        try:
+            telegram_send(f"*{title}*\n\n{content}", tg_token, tg_chat)
+        except Exception as e:
+            logger.warning(f"unified_push telegram error: {e}")
 
 
 def dict2dingding_mark(info_list):
@@ -346,3 +423,17 @@ def wx_work_send(msg, webhook_url):
     }
     conn = http_req(webhook_url, method='post', json=send_data)
     return conn.json()
+
+def telegram_send(msg, bot_token, chat_id):
+    url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+    payload = {
+        "chat_id": chat_id,
+        "text": msg,
+        "parse_mode": "Markdown"
+    }
+    try:
+        conn = http_req(url, method='post', json=payload, timeout=10)
+        return conn.json()
+    except Exception as e:
+        logger.warning(f"telegram_send error: {e}")
+        return {}

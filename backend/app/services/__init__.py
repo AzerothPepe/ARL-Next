@@ -7,7 +7,7 @@ from .siteScreenshot import site_screenshot
 from .fetchSite import fetch_favicon, fetch_site
 from .probeHTTP import probe_http
 from .buildDomainInfo import build_domain_info
-from .searchEngines import baidu_search, bing_search
+from .searchEngines import so_search, bing_search
 from .siteUrlSpider import site_spider, site_spider_thread
 from .webAnalyze import web_analyze
 from .fofaClient import fofa_query

@@ -106,10 +106,13 @@ class InfoHunter(object):
             logger.warning("not found webInfoHunter binary")
             return []
 
-        self._get_target_file()
-        self.exec_wih()
-        results = self.dump_result()
-        self._delete_file()
+        results = []
+        try:
+            self._get_target_file()
+            self.exec_wih()
+            results = self.dump_result()
+        finally:
+            self._delete_file()
 
         return results
 

@@ -136,6 +136,8 @@ class GeneralConfig(ARLResource):
             "fofa_url": Config.FOFA_URL,
             "fofa_max_page": Config.FOFA_MAX_PAGE,
             "fofa_page_size": Config.FOFA_PAGE_SIZE,
+            "so_search_cookie": Config.SO_SEARCH_COOKIE,
+            "bing_search_cookie": Config.BING_SEARCH_COOKIE,
             "github_token": Config.GITHUB_TOKEN,
 
             "tyc_id": Config.TYC_ID,
@@ -166,6 +168,10 @@ class GeneralConfig(ARLResource):
             "wxwork": {
                 "webhook_url": Config.WX_WORK_WEBHOOK
             },
+            "telegram": {
+                "bot_token": Config.TG_BOT_TOKEN,
+                "chat_id": Config.TG_CHAT_ID
+            },
             "email": {
                 "host": Config.EMAIL_HOST,
                 "port": Config.EMAIL_PORT,
@@ -173,7 +179,8 @@ class GeneralConfig(ARLResource):
                 "password": Config.EMAIL_PASSWORD,
                 "to": Config.EMAIL_TO
             },
-            "query_plugin_config": Config.QUERY_PLUGIN_CONFIG
+            "query_plugin_config": Config.QUERY_PLUGIN_CONFIG,
+            "push_options": Config.PUSH_OPTIONS
         }
 
         return {
@@ -199,8 +206,11 @@ class GeneralConfig(ARLResource):
         # 外部API
         if "fofa_key" in req_data: doc["fofa_key"] = req_data["fofa_key"]
         if "fofa_url" in req_data: doc["fofa_url"] = req_data["fofa_url"]
-        if "fofa_max_page" in req_data: doc["fofa_max_page"] = int(req_data["fofa_max_page"])
-        if "fofa_page_size" in req_data: doc["fofa_page_size"] = int(req_data["fofa_page_size"])
+        if "fofa_max_page" in req_data and req_data["fofa_max_page"] is not None: doc["fofa_max_page"] = int(req_data["fofa_max_page"] or 0)
+        if "fofa_page_size" in req_data and req_data["fofa_page_size"] is not None: doc["fofa_page_size"] = int(req_data["fofa_page_size"] or 0)
+        
+        if "so_search_cookie" in req_data: doc["so_search_cookie"] = req_data["so_search_cookie"]
+        if "bing_search_cookie" in req_data: doc["bing_search_cookie"] = req_data["bing_search_cookie"]
         if "github_token" in req_data: doc["github_token"] = req_data["github_token"]
 
         if "tyc_id" in req_data: doc["tyc_id"] = req_data["tyc_id"]
@@ -209,8 +219,8 @@ class GeneralConfig(ARLResource):
         # 代理与并发
         if "proxy_url" in req_data: doc["proxy_url"] = req_data["proxy_url"]
         if "port_top_10" in req_data: doc["port_top_10"] = req_data["port_top_10"]
-        if "domain_brute_concurrent" in req_data: doc["domain_brute_concurrent"] = int(req_data["domain_brute_concurrent"])
-        if "alt_dns_concurrent" in req_data: doc["alt_dns_concurrent"] = int(req_data["alt_dns_concurrent"])
+        if "domain_brute_concurrent" in req_data and req_data["domain_brute_concurrent"] is not None: doc["domain_brute_concurrent"] = int(req_data["domain_brute_concurrent"] or 0)
+        if "alt_dns_concurrent" in req_data and req_data["alt_dns_concurrent"] is not None: doc["alt_dns_concurrent"] = int(req_data["alt_dns_concurrent"] or 0)
 
         # 字典
         if "file_leak_dict" in req_data: doc["file_leak_dict"] = req_data["file_leak_dict"]
@@ -233,6 +243,9 @@ class GeneralConfig(ARLResource):
             doc["feishu_secret"] = req_data["feishu"].get("secret")
         if "wxwork" in req_data:
             doc["wx_work_webhook"] = req_data["wxwork"].get("webhook_url")
+        if "telegram" in req_data:
+            doc["tg_bot_token"] = req_data["telegram"].get("bot_token")
+            doc["tg_chat_id"] = req_data["telegram"].get("chat_id")
         if "email" in req_data:
             doc["email_host"] = req_data["email"].get("host")
             doc["email_port"] = req_data["email"].get("port")
@@ -240,6 +253,7 @@ class GeneralConfig(ARLResource):
             doc["email_password"] = req_data["email"].get("password")
             doc["email_to"] = req_data["email"].get("to")
         if "query_plugin_config" in req_data: doc["query_plugin_config"] = req_data["query_plugin_config"]
+        if "push_options" in req_data: doc["push_options"] = req_data["push_options"]
 
         conn_db('system_config').update_one(
             {"_id": "general_config"},
@@ -263,7 +277,7 @@ class TestPush(ARLResource):
         测试消息推送配置
         """
         from flask import request
-        from app.utils.push import dingding_send, feishu_send, wx_work_send, send_email
+        from app.utils.push import dingding_send, feishu_send, wx_work_send, send_email, telegram_send
         from app.utils import http_req
 
         req_data = request.json
@@ -305,6 +319,15 @@ class TestPush(ARLResource):
                 if res.get("errcode") != 0:
                     return {"code": 500, "message": f"企业微信推送失败: {res}"}
                 return {"code": 200, "message": "企业微信测试推送成功"}
+            elif push_type == "telegram":
+                bot_token = config.get("bot_token")
+                chat_id = config.get("chat_id")
+                if not bot_token or not chat_id:
+                    return {"code": 400, "message": "Telegram 测试失败：Bot Token 或 Chat ID 不能为空"}
+                res = telegram_send(msg=test_msg, bot_token=bot_token, chat_id=chat_id)
+                if not res.get("ok"):
+                    return {"code": 500, "message": f"Telegram 推送失败: {res}"}
+                return {"code": 200, "message": "Telegram 测试推送成功"}
 
             elif push_type == "email":
                 host = config.get("host")
@@ -347,4 +370,3 @@ class TestPush(ARLResource):
 
         except Exception as e:
             return {"code": 500, "message": f"测试推送过程中发生异常: {str(e)}"}
-

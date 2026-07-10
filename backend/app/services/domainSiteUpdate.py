@@ -52,10 +52,28 @@ class DomainSiteUpdate(object):
         if site_info_list:
             utils.conn_db('site').insert_many(site_info_list)
 
+        # Update available_sites to exactly match the fetched sites
+        # This ensures site_screenshot targets the exact URLs in the database
+        self.available_sites = []
+        for site_info in site_info_list:
+            self.available_sites.append(site_info["site"])
+
     # 对域名进行检查，如果域名不在任务范围内，就不进行更新
     def set_and_check_domains(self):
         task_domains = find_domain_by_task_id(self.task_id)
         self.domains = list(set(self.domains) - set(task_domains))
+
+    def site_screenshot(self):
+        from app.config import Config
+        from app import services
+        from bson import ObjectId
+        
+        task = utils.conn_db('task').find_one({'_id': ObjectId(self.task_id)})
+        if task and task.get("options", {}).get("site_capture"):
+            logger.info("start domain site screenshot task_id: {}, len: {}".format(self.task_id, len(self.available_sites)))
+            capture_save_dir = Config.SCREENSHOT_DIR + "/" + self.task_id
+            services.site_screenshot(self.available_sites, concurrency=6, capture_dir=capture_save_dir)
+            logger.info("end domain site screenshot")
 
     def run(self):
         status_name = f"{self.source}_domain_update"
@@ -70,6 +88,7 @@ class DomainSiteUpdate(object):
         self.save_domain_info()
         self.probe_sites()
         self.save_site_info()
+        self.site_screenshot()
         elapse = time.time() - t1
 
         self.base_update_task.update_services(status_name, elapse)

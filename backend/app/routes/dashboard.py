@@ -29,7 +29,7 @@ class DashboardStats(ARLResource):
         today_str = datetime.now().strftime("%Y-%m-%d") + " 00:00:00"
         today_tasks = conn('task').count({"start_time": {"$gte": today_str}})
         
-        today_start_dt = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        today_start_dt = datetime.now().astimezone().replace(hour=0, minute=0, second=0, microsecond=0)
         today_start_oid = ObjectId.from_datetime(today_start_dt)
         today_new_assets = conn('asset_site').count({"_id": {"$gte": today_start_oid}})
         
@@ -68,7 +68,7 @@ class DashboardTrend(ARLResource):
         vulns = []
         
         for i in range(6, -1, -1):
-            target_date = datetime.now() - timedelta(days=i)
+            target_date = datetime.now().astimezone() - timedelta(days=i)
             day_str = target_date.strftime("%m-%d")
             start_dt = target_date.replace(hour=0, minute=0, second=0, microsecond=0)
             end_dt = target_date.replace(hour=23, minute=59, second=59, microsecond=999999)
@@ -77,8 +77,10 @@ class DashboardTrend(ARLResource):
             start_oid = ObjectId.from_datetime(start_dt)
             end_oid = ObjectId.from_datetime(end_dt)
             c_assets = conn('asset_site').count({"_id": {"$gte": start_oid, "$lte": end_oid}})
-            c_vulns = conn('vuln').count({"save_date": {"$gte": start_dt, "$lte": end_dt}}) + \
-                      conn('nuclei_result').count({"save_date": {"$gte": start_dt, "$lte": end_dt}})
+            start_dt_str = start_dt.strftime("%Y-%m-%d %H:%M:%S")
+            end_dt_str = end_dt.strftime("%Y-%m-%d %H:%M:%S")
+            c_vulns = conn('vuln').count({"save_date": {"$gte": start_dt_str, "$lte": end_dt_str}}) + \
+                      conn('nuclei_result').count({"save_date": {"$gte": start_dt_str, "$lte": end_dt_str}})
             
             days.append(day_str)
             assets.append(c_assets)

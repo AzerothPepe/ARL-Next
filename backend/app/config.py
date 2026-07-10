@@ -42,7 +42,8 @@ DYNAMIC_PROPERTIES = {
     "EMAIL_HOST", "EMAIL_PORT", "EMAIL_USERNAME", "EMAIL_PASSWORD", "EMAIL_TO",
     "GITHUB_TOKEN", "DOMAIN_BRUTE_CONCURRENT", "ALT_DNS_CONCURRENT",
     "PROXY_URL", "QUERY_PLUGIN_CONFIG", "WEB_HOOK_URL", "WEB_HOOK_TOKEN",
-    "AUTH", "API_KEY", "TYC_ID", "TYC_TOKEN"
+    "AUTH", "API_KEY", "TYC_ID", "TYC_TOKEN", "PUSH_OPTIONS",
+    "TG_BOT_TOKEN", "TG_CHAT_ID", "SO_SEARCH_COOKIE", "BING_SEARCH_COOKIE"
 }
 
 DYNAMIC_KEYS_MAP = {
@@ -53,7 +54,10 @@ DYNAMIC_KEYS_MAP = {
     "WEB_HOOK_URL": "webhook_url",
     "WEB_HOOK_TOKEN": "webhook_token",
     "TYC_ID": "tyc_id",
-    "TYC_TOKEN": "tyc_token"
+    "TYC_TOKEN": "tyc_token",
+    "PUSH_OPTIONS": "push_options",
+    "SO_SEARCH_COOKIE": "so_search_cookie",
+    "BING_SEARCH_COOKIE": "bing_search_cookie"
 }
 
 class ConfigMeta(type):
@@ -163,6 +167,15 @@ class Config(object, metaclass=ConfigMeta):
 
     _WEB_HOOK_URL = ""
     _WEB_HOOK_TOKEN = ""
+    _WX_WORK_WEBHOOK = ""
+
+    _TG_BOT_TOKEN = ""
+    _TG_CHAT_ID = ""
+
+    _PUSH_OPTIONS = ['task_complete', 'github_leak', 'github_cve', 'github_tools', 'github_hackers', 'asset_site']
+
+    _SO_SEARCH_COOKIE = ""
+    _BING_SEARCH_COOKIE = ""
 
 
 try:

@@ -360,7 +360,7 @@
 
     <div v-show="activeTab === 'syslog'">
       <div style="border: 1px solid #e8e8e8; border-radius: 4px; padding: 8px; background-color: #fafafa;">
-        <div ref="terminalContainer" style="background-color: #001529; color: #e6f7ff; font-family: 'Fira Code', Consolas, 'Courier New', monospace; padding: 16px; border-radius: 4px; height: 60vh; overflow-y: auto; font-size: 13px; line-height: 1.6; box-shadow: inset 0 2px 8px rgba(0,0,0,0.2);" @mouseenter="pauseScroll = true" @mouseleave="pauseScroll = false">
+        <div ref="terminalContainer" style="background-color: #001529; color: #e6f7ff; font-family: 'Fira Code', Consolas, 'Courier New', monospace; padding: 16px; border-radius: 4px; height: calc(100vh - 240px); overflow-y: auto; font-size: 13px; line-height: 1.6; box-shadow: inset 0 2px 8px rgba(0,0,0,0.2);" @mouseenter="pauseScroll = true" @mouseleave="pauseScroll = false">
           <div v-for="(log, idx) in dataSource" :key="log._id || log.id || idx" style="margin-bottom: 6px; word-break: break-all; border-bottom: 1px dashed rgba(255,255,255,0.1); padding-bottom: 4px;">
             <span style="color: #00bcd4; margin-right: 8px;">[{{ log.create_time }}]</span>
             <span :style="{ color: log.level === 'error' ? '#ff4d4f' : log.level === 'warning' ? '#faad14' : '#52c41a', fontWeight: 'bold', marginRight: '8px' }">[{{ (log.level || 'info').toUpperCase() }}]</span>
@@ -854,6 +854,10 @@ const fetchData = async (isPolling = false) => {
       }
     }
 
+    if (activeTab.value === 'syslog') {
+      params.order = 'create_time';
+    }
+
     const res = await request.get(config.url, { params });
     if (res.code === 200) {
       dataSource.value = res.items || [];
@@ -994,7 +998,7 @@ const startSyslogTimer = () => {
   if (syslogTimer) clearInterval(syslogTimer);
   syslogTimer = setInterval(() => {
     fetchData(true);
-  }, 3000); // 每 3 秒拉取一次最新日志
+  }, 5000); // 每 5 秒拉取一次最新日志
 };
 
 const stopSyslogTimer = () => {
