@@ -66,14 +66,11 @@ class DomainSiteUpdate(object):
     def site_screenshot(self):
         from app.config import Config
         from app import services
-        from bson import ObjectId
         
-        task = utils.conn_db('task').find_one({'_id': ObjectId(self.task_id)})
-        if task and task.get("options", {}).get("site_capture"):
-            logger.info("start domain site screenshot task_id: {}, len: {}".format(self.task_id, len(self.available_sites)))
-            capture_save_dir = Config.SCREENSHOT_DIR + "/" + self.task_id
-            services.site_screenshot(self.available_sites, concurrency=6, capture_dir=capture_save_dir)
-            logger.info("end domain site screenshot")
+        logger.info("start domain site screenshot task_id: {}, len: {}".format(self.task_id, len(self.available_sites)))
+        capture_save_dir = Config.SCREENSHOT_DIR + "/" + self.task_id
+        services.site_screenshot(self.available_sites, concurrency=6, capture_dir=capture_save_dir)
+        logger.info("end domain site screenshot")
 
     def run(self):
         status_name = f"{self.source}_domain_update"

@@ -38,13 +38,15 @@ RUN cd /tmp && \
 
 # 下载 Nuclei
 RUN ARCH=$(dpkg --print-architecture) && \
-    if [ "$ARCH" = "amd64" ]; then NUCLEI_ZIP="nuclei_3.3.0_linux_amd64.zip"; else NUCLEI_ZIP="nuclei_3.3.0_linux_arm64.zip"; fi && \
-    wget -t 10 "https://github.com/projectdiscovery/nuclei/releases/download/v3.3.0/$NUCLEI_ZIP" -O $NUCLEI_ZIP || wget -t 10 "https://gh-proxy.com/https://github.com/projectdiscovery/nuclei/releases/download/v3.3.0/$NUCLEI_ZIP" -O $NUCLEI_ZIP && \
+    if [ "$ARCH" = "amd64" ]; then NUCLEI_ZIP="nuclei_3.11.0_linux_amd64.zip"; else NUCLEI_ZIP="nuclei_3.11.0_linux_arm64.zip"; fi && \
+    wget -t 10 "https://github.com/projectdiscovery/nuclei/releases/download/v3.11.0/$NUCLEI_ZIP" -O $NUCLEI_ZIP || wget -t 10 "https://gh-proxy.com/https://github.com/projectdiscovery/nuclei/releases/download/v3.11.0/$NUCLEI_ZIP" -O $NUCLEI_ZIP && \
     unzip $NUCLEI_ZIP && mv nuclei /usr/local/bin/ && chmod +x /usr/local/bin/nuclei && /usr/local/bin/nuclei -update-templates || true
 
-# 设置工作目录并拷贝后端源码到容器
+# 设置工作目录并拷贝源码与部署文件到容器
 WORKDIR /code
 COPY ./backend /code/backend
+COPY ./version.txt ./start-prod.sh ./docker-compose.prod.yml /code/
+COPY ./updater /code/updater
 
 # 在构建镜像时就创建好虚拟环境并安装好依赖，使生产环境自包含
 # 全局安装必备组件（默认海外源）

@@ -47,13 +47,14 @@ const onFinish = async (values) => {
       password: values.password
     });
 
-    // 铁证2：build_data() 函数默认成功的 code 就是 200
     if (loginRes.code === 200) {
       // 拿到后端下发的 Token 并存储
       localStorage.setItem('token', loginRes.data.token);
 
       // 铁证3：不需要额外请求用户信息，直接跳转到主页 (Task页)
       router.push('/');
+    } else if (loginRes.code === 401) {
+      alert('登录失败：账号或密码错误！');
     } else {
       alert('登录失败：' + (loginRes.message || '未知错误'));
     }

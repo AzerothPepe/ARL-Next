@@ -2,6 +2,10 @@ import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import { fileURLToPath, URL } from 'node:url'
 import fs from 'node:fs'
+import viteCompression from 'vite-plugin-compression'
+import Components from 'unplugin-vue-components/vite';
+import { AntDesignVueResolver } from 'unplugin-vue-components/resolvers';
+import AutoImport from 'unplugin-auto-import/vite';
 
 // https://vite.dev/config/
 export default defineConfig(({ command }) => {
@@ -42,7 +46,32 @@ export default defineConfig(({ command }) => {
   console.log(`📡 API 转发目标设置为: ${apiTarget}`);
 
   return {
-    plugins: [vue()],
+    plugins: [
+      vue(),
+      AutoImport({
+        imports: ['vue', 'vue-router'],
+        resolvers: [AntDesignVueResolver()],
+      }),
+      Components({
+        resolvers: [
+          AntDesignVueResolver({
+            importStyle: false, // css in js
+          }),
+        ],
+      }),
+      viteCompression({
+        verbose: true,
+        disable: false,
+        threshold: 10240, // only compress files larger than 10k
+        algorithm: 'gzip',
+        ext: '.gz',
+      })
+    ],
+
+    // 生产环境移除 console.log 和 debugger，提升运行性能
+    esbuild: {
+      drop: command === 'build' ? ['console', 'debugger'] : [],
+    },
 
     resolve: {
       alias: {

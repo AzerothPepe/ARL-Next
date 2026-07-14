@@ -1,5 +1,6 @@
 server {
-    listen       5173 ssl http2;
+    listen       5173 ssl;
+    http2        on;
     server_name  localhost;
 
     ssl_certificate      /certs/arl.crt;
@@ -13,6 +14,7 @@ server {
 
     # 开启 gzip 压缩加速静态资源加载
     gzip on;
+    gzip_static on; # 优先使用前端预生成的 .gz 文件，降低 CPU 消耗
     gzip_min_length 1k;
     gzip_comp_level 6;
     gzip_types text/plain text/css application/json application/javascript text/xml application/xml application/xml+rss text/javascript image/svg+xml;
@@ -27,6 +29,13 @@ server {
         try_files $uri $uri/ /index.html;
     }
 
+    # 针对静态资源添加长缓存
+    location ^~ /assets/ {
+        root   /usr/share/nginx/html;
+        add_header Cache-Control "public, max-age=31536000, immutable";
+        access_log off;
+    }
+
     # 针对 index.html 禁用缓存，确保每次加载最新的前端资源
     location = /index.html {
         root   /usr/share/nginx/html;
@@ -38,6 +47,19 @@ server {
     # 2. 动态 API 反向代理
     location /api/ {
         proxy_pass http://arl-web:5000/api/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # 3. 代理更新服务 SSE (解决 Mixed Content 与跨域端口屏蔽问题)
+    location /update_stream/ {
+        proxy_pass http://172.18.0.1:8888/update/;
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+        proxy_buffering off;
+        proxy_cache off;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;

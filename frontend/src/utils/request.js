@@ -38,6 +38,11 @@ request.interceptors.response.use(
         // 核心逻辑：精准捕获 ARL 的 401 状态
         if (res.code === 401 || res.message === 'not login') {
 
+            // 如果是登录接口返回的 401（账号密码错误），直接放行给页面处理，不拦截踢人
+            if (response.config && response.config.url && response.config.url.includes('/user/login')) {
+                return res;
+            }
+
             // 如果锁没开启，说明是第一个报错的请求
             if (!isRedirecting) {
                 isRedirecting = true; // 上锁

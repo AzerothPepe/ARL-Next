@@ -370,3 +370,41 @@ class TestPush(ARLResource):
 
         except Exception as e:
             return {"code": 500, "message": f"测试推送过程中发生异常: {str(e)}"}
+
+@ns.route('/local_version')
+class LocalVersion(ARLResource):
+    @auth
+    def get(self):
+        """
+        获取当前本地版本号（通过读取版本文件）
+        """
+        import os
+        try:
+            version_file = '/code/version.txt'
+            if os.path.exists(version_file):
+                with open(version_file, 'r') as f:
+                    version = f.read().strip()
+                    if version:
+                        return {"code": 200, "message": "success", "data": {"version": version}}
+        except Exception:
+            pass
+        return {"code": 200, "message": "success", "data": {"version": "未知版本"}}
+
+@ns.route('/request_update_token')
+class RequestUpdateToken(ARLResource):
+    @auth
+    def post(self):
+        """
+        请求一个用于进行系统更新的一次性 Token
+        """
+        import uuid
+        import os
+        token = str(uuid.uuid4()).replace('-', '')
+        
+        try:
+            with open('/tmp/arl_update_token', 'w') as f:
+                f.write(token)
+            return {"code": 200, "message": "Token 生成成功", "data": {"token": token}}
+        except Exception as e:
+            return {"code": 500, "message": f"生成更新 Token 失败: {str(e)}"}
+

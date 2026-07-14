@@ -22,10 +22,23 @@ const routes = [
         name: 'Layout',
         component: Layout,
         redirect: '/dashboard',
-        beforeEnter: (to, from, next) => {
+        beforeEnter: async (to, from, next) => {
             const token = localStorage.getItem('token')
-            if (token) next()
-            else next('/login')
+            if (!token) {
+                return next('/login')
+            }
+            // 真正发起一次轻量级请求校验 Token，而不是无脑信任 localStorage
+            try {
+                // 动态导入 request 防止循环依赖，或者直接在顶部 import
+                const { default: request } = await import('../utils/request.js');
+                await request.get('/api/system_config/local_version');
+                next();
+            } catch (error) {
+                // 请求失败（如 401 报错），清除无效 token 并拦在门外
+                localStorage.removeItem('token');
+                localStorage.removeItem('userInfo');
+                next('/login');
+            }
         },
         children: [
             {

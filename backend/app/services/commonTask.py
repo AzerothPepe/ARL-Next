@@ -309,9 +309,8 @@ class WebSiteFetch(object):
         # 清空，节省内存
         self.site_info_list = []
 
-        """ *** 站点截图 """
-        if self.options.get(WebSiteFetchOption.SITE_CAPTURE):
-            self.run_func(WebSiteFetchStatus.SITE_CAPTURE, self.site_screenshot)
+        """ *** 站点截图（强制执行） *** """
+        self.run_func(WebSiteFetchStatus.SITE_CAPTURE, self.site_screenshot)
 
         """ ***调用站点爬虫发现URL """
         if self.options.get(WebSiteFetchOption.SITE_SPIDER):

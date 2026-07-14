@@ -710,7 +710,6 @@ const pluginCategories = [
     title: '🕷️ Web 深度探测',
     plugins: [
       { key: 'site_identify', label: '站点识别' },
-      { key: 'site_capture', label: '站点截图' },
       { key: 'search_engines', label: '搜索引擎调用' },
       { key: 'site_spider', label: '站点爬虫' },
       { key: 'web_info_hunter', label: 'WIH 调用' },
@@ -730,7 +729,7 @@ const defaultPlugins = {
   domain_brute: true, alt_dns: true, dns_query_plugin: true, arl_search: true,
   port_scan: true, service_detection: false, os_detection: false, ssl_cert: false,
   skip_scan_cdn_ip: true, site_identify: false, search_engines: false, site_spider: false,
-  site_capture: false, file_leak: false, findvhost: false, nuclei_scan: false, web_info_hunter: false,
+  file_leak: false, findvhost: false, nuclei_scan: false, web_info_hunter: false,
   npoc_service_detection: false
 };
 

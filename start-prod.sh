@@ -271,6 +271,42 @@ if [ -f "./ssl-certs/arl.crt" ]; then
 fi
 echo "✅ 证书目录与文件权限已配置完毕！"
 
+# 3. 部署并启动系统更新服务 (updater)
+echo "🔄 正在配置并启动系统底层更新服务 (arl-updater)..."
+UPDATER_DIR="$(pwd)/updater"
+UPDATER_SCRIPT="$UPDATER_DIR/updater.py"
+SERVICE_FILE="/etc/systemd/system/arl-updater.service"
+
+if [ -f "$UPDATER_SCRIPT" ]; then
+    cat > "$SERVICE_FILE" <<EOF
+[Unit]
+Description=ARL-Next Update Service
+After=network.target docker.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=$UPDATER_DIR
+ExecStart=/usr/bin/env python3 $UPDATER_SCRIPT
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+    systemctl daemon-reload
+    if [ "$ARL_UPDATER_SKIP_RESTART" != "1" ]; then
+        systemctl enable arl-updater.service >/dev/null 2>&1
+        systemctl restart arl-updater.service
+        echo "✅ 系统更新服务启动成功！"
+    else
+        echo "✅ 跳过重启当前正在执行的更新服务..."
+    fi
+else
+    echo "⚠️ 警告：未找到更新服务脚本 $UPDATER_SCRIPT，将跳过更新服务的配置。"
+fi
+
 # （旧版镜像预拉取函数已废除，转为基于阿里云仓库全量拉取）
 
 # 4. 从阿里云镜像仓库极速拉取并启动生产服务
@@ -279,6 +315,21 @@ docker compose -f docker-compose.prod.yml pull
 
 echo "🚀 正在启动生产多服务容器组..."
 docker compose -f docker-compose.prod.yml up -d
+
+echo "⏳ 正在等待容器服务启动并进行健康状态检查 (大约需要 15 秒)..."
+sleep 15
+
+# 检查是否有容器处于 exited 或 restarting 状态
+FAILED_SERVICES=$(docker compose -f docker-compose.prod.yml ps --status exited --status restarting --services)
+
+if [ -n "$FAILED_SERVICES" ]; then
+    echo "❌ 警告：部分服务启动失败或正在无限重启中！"
+    echo "异常服务列表："
+    echo "$FAILED_SERVICES"
+    echo "👉 建议稍后通过终端进入服务器执行 'docker compose -f docker-compose.prod.yml logs <服务名>' 查看具体报错。"
+else
+    echo "✅ 所有容器均已成功启动并稳定运行中！系统更新成功！"
+fi
 
 # 5. 获取本地与公网真实 IP 并展示
 LOCAL_IP=$(hostname -I 2>/dev/null | awk '{print $1}')

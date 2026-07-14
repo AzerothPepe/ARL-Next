@@ -631,12 +631,57 @@ admin123
           </a-spin>
         </div>
       </a-tab-pane>
+      <a-tab-pane key="system_update" tab="系统版本与更新" force-render>
+        <div class="tab-content" style="padding: 20px;">
+          <a-card title="系统更新管理" :bordered="false" style="max-width: 800px;">
+            <a-descriptions bordered :column="1">
+              <a-descriptions-item label="当前本地版本">
+                <a-tag color="blue">{{ localVersion || '获取中...' }}</a-tag>
+              </a-descriptions-item>
+              <a-descriptions-item label="最新可用版本">
+                <a-tag :color="hasNewVersion ? 'red' : 'green'">{{ remoteVersion || '获取中...' }}</a-tag>
+                <span v-if="hasNewVersion" style="margin-left: 10px; color: #f5222d; font-weight: bold;">
+                  发现新版本！建议立即更新。
+                </span>
+                <span v-else-if="remoteVersion" style="margin-left: 10px; color: #52c41a;">
+                  已是最新版本。
+                </span>
+              </a-descriptions-item>
+              <a-descriptions-item v-if="hasNewVersion" label="更新日志" style="white-space: pre-wrap;">
+                {{ releaseNotes }}
+              </a-descriptions-item>
+            </a-descriptions>
+            
+            <div style="margin-top: 20px; text-align: center;">
+              <a-button type="primary" size="large" danger @click="startUpdate" :disabled="!hasNewVersion && !forceUpdateMode">
+                一键系统更新
+              </a-button>
+              <div style="margin-top: 10px;">
+                <a-checkbox v-model:checked="forceUpdateMode">强制显示更新按钮</a-checkbox>
+              </div>
+            </div>
+          </a-card>
+        </div>
+      </a-tab-pane>
     </a-tabs>
+
+    <!-- 系统更新日志 Modal -->
+    <a-modal v-model:open="updateModalVisible" title="系统更新中，请勿关闭页面" :closable="false" :maskClosable="false" :footer="null" width="800px">
+      <div style="margin-bottom: 15px;">
+        <a-progress :percent="updateProgress" status="active" />
+      </div>
+      <div style="background-color: #1e1e1e; color: #00ff00; padding: 15px; border-radius: 4px; font-family: 'Consolas', 'Courier New', monospace; height: 400px; overflow-y: auto; scroll-behavior: smooth;" ref="terminalRef">
+        <pre style="margin: 0; white-space: pre-wrap; font-family: inherit; color: inherit; background: transparent; border: none; padding: 0;">{{ updateLogs }}</pre>
+      </div>
+      <div v-if="updateFinished" style="margin-top: 15px; text-align: center;">
+        <a-button type="primary" @click="() => window.location.reload()">重新加载页面</a-button>
+      </div>
+    </a-modal>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, computed } from 'vue';
+import { ref, reactive, onMounted, computed, nextTick } from 'vue';
 import { message } from 'ant-design-vue';
 import request from '@/utils/request';
 
@@ -1368,7 +1413,130 @@ const fetchBruteDictList = async () => {
   }
 };
 
+const localVersion = ref('');
+const remoteVersion = ref('');
+const releaseNotes = ref('');
+const hasNewVersion = ref(false);
+const forceUpdateMode = ref(false);
+
+const updateModalVisible = ref(false);
+const updateLogs = ref([]);
+const updateProgress = ref(0);
+const updateFinished = ref(false);
+const terminalRef = ref(null);
+
+const checkVersion = async () => {
+  try {
+    const res = await request.get('/api/system_config/local_version');
+    if (res.code === 200) {
+      localVersion.value = res.data.version;
+    }
+    
+    const ghRes = await fetch('https://api.github.com/repos/owl234/ARL-Next/tags');
+    if (ghRes.ok) {
+      const ghData = await ghRes.json();
+      if (ghData && ghData.length > 0) {
+        remoteVersion.value = ghData[0].name;
+      }
+    }
+      
+    if (localVersion.value && localVersion.value !== remoteVersion.value && localVersion.value !== '未知版本') {
+      hasNewVersion.value = true;
+    }
+  } catch (e) {
+    console.error('检查版本失败', e);
+  }
+};
+
+const startUpdate = async () => {
+  try {
+    const res = await request.post('/api/system_config/request_update_token');
+    if (res.code !== 200) {
+      message.error(res.message || '获取更新令牌失败');
+      return;
+    }
+    const token = res.data.token;
+    
+    updateModalVisible.value = true;
+    updateLogs.value = '⏳ 正在触发更新服务...\n';
+    updateProgress.value = 10;
+    updateFinished.value = false;
+    
+    // 1. 触发更新
+    const triggerUrl = `/update_stream/trigger?token=${token}`;
+    try {
+      const triggerRes = await fetch(triggerUrl);
+      if (!triggerRes.ok) {
+        updateLogs.value += '[ERROR] 触发更新失败，服务返回异常状态码。\n';
+        updateFinished.value = true;
+        return;
+      }
+    } catch (e) {
+      updateLogs.value += '[ERROR] 无法连接到更新服务，请检查网络。\n';
+      updateFinished.value = true;
+      return;
+    }
+
+    // 2. 开始轮询日志
+    const pollUrl = `/update_stream/log`;
+    let pollInterval = setInterval(async () => {
+      try {
+        const logRes = await fetch(pollUrl);
+        if (!logRes.ok) {
+          // 502 可能是网关重启，不报错，仅记录
+          if (!updateLogs.value.includes('等待网络恢复')) {
+            updateLogs.value += '⏳ 网关重启中或服务暂时不可达，正在等待网络恢复...\n';
+            scrollToBottom();
+          }
+          return;
+        }
+        const logText = await logRes.text();
+        
+        // 解析进度，简单计算进度条
+        if (logText.includes('后台任务已启动')) updateProgress.value = 20;
+        if (logText.includes('同步完毕')) updateProgress.value = 50;
+        if (logText.includes('开始执行 start-prod.sh')) updateProgress.value = 85;
+        
+        updateLogs.value = logText;
+        scrollToBottom();
+
+        // 检查是否结束
+        if (logText.includes('[DONE]')) {
+          clearInterval(pollInterval);
+          updateProgress.value = 100;
+          updateFinished.value = true;
+          setTimeout(() => {
+            window.location.reload();
+          }, 1500);
+        } else if (logText.includes('[ERROR]')) {
+          clearInterval(pollInterval);
+          updateFinished.value = true;
+        }
+      } catch (err) {
+        // 网络请求失败（容器重启时）忽略错误，继续轮询
+        if (!updateLogs.value.includes('等待容器恢复')) {
+          updateLogs.value += '⏳ 网络暂时断开，正在等待容器恢复...\n';
+          scrollToBottom();
+        }
+      }
+    }, 1500);
+    
+  } catch (e) {
+    message.error('启动更新失败');
+    console.error(e);
+  }
+};
+
+const scrollToBottom = () => {
+  nextTick(() => {
+    if (terminalRef.value) {
+      terminalRef.value.scrollTop = terminalRef.value.scrollHeight;
+    }
+  });
+};
+
 onMounted(() => {
+  checkVersion();
   fetchDictList();
   fetchBruteDictList();
   fetchCdnList();

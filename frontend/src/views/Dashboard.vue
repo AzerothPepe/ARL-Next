@@ -184,7 +184,20 @@ import {
   AlertOutlined, 
   GithubOutlined 
 } from '@ant-design/icons-vue';
-import * as echarts from 'echarts';
+import * as echarts from 'echarts/core';
+import { LineChart, BarChart } from 'echarts/charts';
+import { TitleComponent, TooltipComponent, GridComponent, LegendComponent } from 'echarts/components';
+import { CanvasRenderer } from 'echarts/renderers';
+
+echarts.use([
+  LineChart,
+  BarChart,
+  TitleComponent,
+  TooltipComponent,
+  GridComponent,
+  LegendComponent,
+  CanvasRenderer
+]);
 import request from '@/utils/request';
 
 const router = useRouter();

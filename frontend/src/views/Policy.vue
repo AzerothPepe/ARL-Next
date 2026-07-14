@@ -172,7 +172,6 @@ const getSiteRiskConfigText = (p) => {
   if (p.site_config?.site_identify) l.push('站点识别');
   if (p.site_config?.search_engines) l.push('搜索引擎调用');
   if (p.site_config?.site_spider) l.push('站点爬虫');
-  if (p.site_config?.site_capture) l.push('站点截图');
   if (p.file_leak) l.push('文件泄露');
   if (p.site_config?.nuclei_scan) l.push('nuclei 调用');
   if (p.site_config?.web_info_hunter) l.push('WIH 调用');

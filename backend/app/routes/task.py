@@ -337,6 +337,21 @@ class DeleteTask(ARLResource):
                         ]
                     }
                     utils.conn_db(name).delete_many(delete_query)
+                    
+                # 【逻辑修正】：清理物理截图文件
+                # 由于部分站点可能已被同步至资产组（保留了 scope_id），此时不能盲目删除整个截图文件夹
+                # 我们需要检查该 task_id 下的截图是否还被资产组（asset_site）引用，如果没有，再安全删除文件夹以释放磁盘
+                remaining_asset = utils.conn_db('asset_site').find_one({'task_id': task_id})
+                if not remaining_asset:
+                    import shutil
+                    from app.config import Config
+                    import os
+                    screenshot_path = os.path.join(Config.SCREENSHOT_DIR, task_id)
+                    if os.path.exists(screenshot_path):
+                        try:
+                            shutil.rmtree(screenshot_path, ignore_errors=True)
+                        except Exception as e:
+                            pass
 
         return utils.build_ret(ErrorMsg.Success, {"task_id": task_id_list})
 

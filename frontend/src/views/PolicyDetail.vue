@@ -95,8 +95,7 @@
               <a-checkbox v-show="matchSearch('1. 站点识别', siteSearch)" v-model:checked="policyForm.site_config.site_identify">1. 站点识别</a-checkbox>
               <a-checkbox v-show="matchSearch('2. 搜索引擎调用', siteSearch)" v-model:checked="policyForm.site_config.search_engines">2. 搜索引擎调用</a-checkbox>
               <a-checkbox v-show="matchSearch('3. 站点爬虫', siteSearch)" v-model:checked="policyForm.site_config.site_spider">3. 站点爬虫</a-checkbox>
-              <a-checkbox v-show="matchSearch('4. 站点截图', siteSearch)" v-model:checked="policyForm.site_config.site_capture">4. 站点截图</a-checkbox>
-              <a-checkbox v-show="matchSearch('5. 文件泄露', siteSearch)" v-model:checked="policyForm.file_leak">5. 文件泄露</a-checkbox>
+              <a-checkbox v-show="matchSearch('4. 文件泄露', siteSearch)" v-model:checked="policyForm.file_leak">4. 文件泄露</a-checkbox>
               <a-checkbox v-show="matchSearch('6. nuclei 调用', siteSearch)" v-model:checked="policyForm.site_config.nuclei_scan">6. nuclei 调用</a-checkbox>
               <a-checkbox v-show="matchSearch('7. WIH 调用', siteSearch)" v-model:checked="policyForm.site_config.web_info_hunter">7. WIH 调用</a-checkbox>
             </div>
@@ -171,7 +170,7 @@ const initPolicyForm = () => ({
   domain_config: { domain_brute: false, alt_dns: false, arl_search: false, dns_query_plugin: false, domain_brute_type: 'big' },
   ip_config: { port_scan: false, service_detection: false, os_detection:false, ssl_cert: false, skip_scan_cdn_ip: false, port_scan_type: 'top100', port_custom: '', host_timeout_type: 'default', host_timeout: 0, port_parallelism: 32, port_min_rate: 60, exclude_ports: '' },
   npoc_service_detection: false,
-  site_config: { site_identify: false, search_engines: false, site_spider: false, site_capture: false, nuclei_scan: false, web_info_hunter: false },
+  site_config: { site_identify: false, search_engines: false, site_spider: false, nuclei_scan: false, web_info_hunter: false },
   file_leak: false,
   scope_id: undefined
 });
@@ -241,13 +240,13 @@ const toggleAllDomain = (e) => {
 // ================= 面板3：站点和风险 全选联动逻辑 =================
 const isAllSiteSelected = computed(() => {
   const sc = policyForm.site_config;
-  return sc.site_identify && sc.search_engines && sc.site_spider && sc.site_capture &&
+  return sc.site_identify && sc.search_engines && sc.site_spider &&
       sc.nuclei_scan && sc.web_info_hunter && policyForm.file_leak;
 });
 const toggleAllSite = (e) => {
   const val = e.target.checked;
   const sc = policyForm.site_config;
-  sc.site_identify = sc.search_engines = sc.site_spider = sc.site_capture = sc.nuclei_scan = sc.web_info_hunter = val;
+  sc.site_identify = sc.search_engines = sc.site_spider = sc.nuclei_scan = sc.web_info_hunter = val;
   policyForm.file_leak = val;
 };
 

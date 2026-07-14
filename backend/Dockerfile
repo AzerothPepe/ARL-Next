@@ -55,10 +55,11 @@ RUN wget https://nmap.org/dist/nmap-7.95.tar.bz2 && \
     rm -rf nmap-7.95 nmap-7.95.tar.bz2
 
 
-# 下载并安装 Nuclei v3.3.0 及其漏洞模板 (通过 ghproxy 加速下载)
+# 下载并安装 Nuclei v3.11.0 及其漏洞模板 (通过 ghproxy 加速下载)
 RUN ARCH=$(dpkg --print-architecture) && \
-    if [ "$ARCH" = "amd64" ]; then NUCLEI_ZIP="nuclei_3.3.0_linux_amd64.zip"; else NUCLEI_ZIP="nuclei_3.3.0_linux_arm64.zip"; fi && \
-    wget -t 10 --retry-connrefused https://gh-proxy.com/https://github.com/projectdiscovery/nuclei/releases/download/v3.3.0/$NUCLEI_ZIP && \
+    cd /tmp && \
+    if [ "$ARCH" = "amd64" ]; then NUCLEI_ZIP="nuclei_3.11.0_linux_amd64.zip"; else NUCLEI_ZIP="nuclei_3.11.0_linux_arm64.zip"; fi && \
+    wget -t 10 --retry-connrefused https://gh-proxy.com/https://github.com/projectdiscovery/nuclei/releases/download/v3.11.0/$NUCLEI_ZIP && \
     unzip $NUCLEI_ZIP && \
     mv nuclei /usr/local/bin/ && \
     rm -rf $NUCLEI_ZIP README* LICENSE.md && \

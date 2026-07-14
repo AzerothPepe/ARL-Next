@@ -322,3 +322,14 @@ def clean_task_data(task_id):
             conn_db(table_name).delete_many({'task_id': task_id})
         except Exception as e:
             logger.error(f"Error cleaning {table_name} for task {task_id}: {e}")
+            
+    # 清理遗留的截图文件，防止全量截图模式下撑爆磁盘
+    import shutil
+    from app.config import Config
+    import os
+    screenshot_path = os.path.join(Config.SCREENSHOT_DIR, task_id)
+    if os.path.exists(screenshot_path):
+        try:
+            shutil.rmtree(screenshot_path, ignore_errors=True)
+        except Exception as e:
+            logger.error(f"Error cleaning screenshot dir for task {task_id}: {e}")
